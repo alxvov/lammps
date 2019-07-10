@@ -339,16 +339,23 @@ void MinSpinOSO_LBFGS_LS::calc_gradient(double dts)
   double **sp = atom->sp;
   double **fm = atom->fm;
   double tdampx, tdampy, tdampz;
-  
+  int *type = atom->type;
+
   // loop on all spins on proc.
 
   for (int i = 0; i < nlocal; i++) {
     
     // calc. damping torque
-    
-    tdampx = -alpha_damp*(fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]);
-    tdampy = -alpha_damp*(fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]);
-    tdampz = -alpha_damp*(fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]);
+    if (type[i] == 2){
+      tdampx = 0.0;
+      tdampy = 0.0;
+      tdampz = 0.0;
+    }
+    else{
+      tdampx = -alpha_damp*(fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]);
+      tdampy = -alpha_damp*(fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]);
+      tdampz = -alpha_damp*(fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]);
+    }
 
     // calculate gradients
     
