@@ -51,6 +51,7 @@
 #include "error.h"
 #include "math_const.h"
 #include "utils.h"
+#include <iostream.h>
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -749,7 +750,7 @@ void NEBSpin::print_status()
   }
 
   double fmaxreplica;
-  MPI_Allreduce(&tnorm2,&fmaxreplica,1,MPI_DOUBLE,MPI_MAX,roots);
+  MPI_Allreduce(&tnorm2,&fmaxreplica,1,MPI_DOUBLE,MPI_MAX,roots);  // TODO: what is roots?
 
   double fnorminf = 0.0;
   MPI_Allreduce(&local_norm_inf,&fnorminf,1,MPI_DOUBLE,MPI_MAX,world);
@@ -790,6 +791,7 @@ void NEBSpin::print_status()
   // look up GradV for the initial, final, and climbing replicas
   // these are identical to fnorm2, but to be safe we
   // take them straight from fix_neb
+  // TODO: they are not identical
 
   double gradvnorm0, gradvnorm1, gradvnormc;
 
