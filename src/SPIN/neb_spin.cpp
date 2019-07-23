@@ -737,16 +737,19 @@ void NEBSpin::print_status()
 
   // calc. magnetic torques
 
+  // TODO: change convergence to maximum torque on atom in eV
+  double hbar = force->hplanck/MY_2PI;
+
   tnorm2 = local_norm_inf = temp_inf = 0.0;
   for (int i = 0; i < nlocal; i++) {
     tx = (fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]);
     ty = (fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]);
     tz = (fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]);
-    tnorm2 += tx*tx + ty*ty + tz*tz;
-    temp_inf = MAX(fabs(tx),fabs(ty));
-    temp_inf = MAX(fabs(tz),temp_inf);
+    temp_inf = tx*tx + ty*ty + tz*tz;
+    tnorm2 += temp_inf;
     local_norm_inf = MAX(temp_inf,local_norm_inf);
   }
+  local_norm_inf = sqrt(local_norm_inf) * hbar;
 
   double fmaxreplica;
   MPI_Allreduce(&tnorm2,&fmaxreplica,1,MPI_DOUBLE,MPI_MAX,roots);
@@ -790,6 +793,7 @@ void NEBSpin::print_status()
   // look up GradV for the initial, final, and climbing replicas
   // these are identical to fnorm2, but to be safe we
   // take them straight from fix_neb
+  // TODO: they are not identical
 
   double gradvnorm0, gradvnorm1, gradvnormc;
 
