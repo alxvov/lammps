@@ -51,7 +51,6 @@
 #include "error.h"
 #include "math_const.h"
 #include "utils.h"
-#include <iostream.h>
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
