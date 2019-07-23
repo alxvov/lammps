@@ -650,7 +650,10 @@ int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction)
   kcrossy = kz*spix - kx*spiz;
   kcrossz = kx*spiy - ky*spix;
 
-  kdots = kx*spix + ky*spiz + kz*spiz;
+  // TODO: must be y here
+  //  kdots must be zero as k is perpendicular to spi
+  //  maybe we can delete this part
+  kdots = kx*spix + ky*spiy + kz*spiz;
 
   omega = acos(sidotsf);
   omega *= fraction;
