@@ -575,13 +575,15 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
     }
 
   // first or last replica has no change to forces, just return
+//  TODO: we should not divide dottangrad by gradlen,
+//   also units must be in eV as the energy is in units of eV
 
   if (ireplica > 0 && ireplica < nreplica-1)
-    dottangrad = dottangrad/(tlen*gradlen);
+    dottangrad = hbar * dottangrad/tlen;
   if (ireplica == 0)
-    dottangrad = dottangrad/(nlen*gradlen);
+    dottangrad = hbar * dottangrad/nlen;
   if (ireplica == nreplica-1)
-    dottangrad = dottangrad/(plen*gradlen);
+    dottangrad = hbar * dottangrad/plen;
   if (ireplica < nreplica-1)
     dotgrad = dotgrad /(gradlen*gradnextlen);
 
