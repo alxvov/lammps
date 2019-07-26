@@ -748,9 +748,7 @@ int MinSpinOSO_LBFGS::calc_and_make_step(double a, double b, int index)
 }
 
 /* ----------------------------------------------------------------------
-  Approximate Wolfe conditions:
-  William W. Hager and Hongchao Zhang
-  SIAM J. optim., 16(1), 170-192. (23 pages)
+  Approximate descent
 ------------------------------------------------------------------------- */
 
 int MinSpinOSO_LBFGS::awc(double der_phi_0, double phi_0, double der_phi_j, double phi_j){
@@ -759,9 +757,7 @@ int MinSpinOSO_LBFGS::awc(double der_phi_0, double phi_0, double der_phi_j, doub
   double delta = 0.1;
   double sigma = 0.9;
 
-  if ((phi_j<=phi_0+eps*fabs(phi_0)) &&
-     ((2.0*delta-1.0) * der_phi_0>=der_phi_j) &&
-     (der_phi_j>=sigma*der_phi_0))
+  if (phi_j<=phi_0+eps*fabs(phi_0))
     return 1;
   else
     return 0;
