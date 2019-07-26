@@ -711,7 +711,7 @@ int MinSpinOSO_LBFGS::calc_and_make_step(double a, double b, int index)
   der_e_cur = e_and_d[1];
   index++;
 
-  if (awc(der_e_pr,eprevious,e_and_d[1],e_and_d[0]) || index == 5){
+  if (adescent(eprevious,e_and_d[0]) || index == 5){
     MPI_Bcast(&b,1,MPI_DOUBLE,0,world);
     for (int i = 0; i < 3 * nlocal; i++) {
       p_s[i] = b * p_s[i];
@@ -751,11 +751,9 @@ int MinSpinOSO_LBFGS::calc_and_make_step(double a, double b, int index)
   Approximate descent
 ------------------------------------------------------------------------- */
 
-int MinSpinOSO_LBFGS::awc(double der_phi_0, double phi_0, double der_phi_j, double phi_j){
+int MinSpinOSO_LBFGS::adescent(double phi_0, double phi_j){
 
   double eps = 1.0e-6;
-  double delta = 0.1;
-  double sigma = 0.9;
 
   if (phi_j<=phi_0+eps*fabs(phi_0))
     return 1;
