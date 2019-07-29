@@ -314,14 +314,22 @@ void MinSpinOSO_LBFGS::calc_gradient()
   double **sp = atom->sp;
   double **fm = atom->fm;
   double hbar = force->hplanck/MY_2PI;
+  int *type = atom->type;
 
   // loop on all spins on proc.
 
   for (int i = 0; i < nlocal; i++) {
-    g_cur[3 * i + 0] = (fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]) * hbar;
-    g_cur[3 * i + 1] = -(fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]) * hbar;
-    g_cur[3 * i + 2] = (fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]) * hbar;
-  }
+
+    if (type[i] == 2){
+      g_cur[3 * i + 0] = 0.0;
+      g_cur[3 * i + 1] = 0.0;
+      g_cur[3 * i + 2] = 0.0;
+    }
+    else{
+      g_cur[3 * i + 0] = (fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]) * hbar;
+      g_cur[3 * i + 1] = -(fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]) * hbar;
+      g_cur[3 * i + 2] = (fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]) * hbar;
+    }
 }
 
 /* ----------------------------------------------------------------------
