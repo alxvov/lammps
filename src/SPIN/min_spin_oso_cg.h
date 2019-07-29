@@ -55,7 +55,7 @@ class MinSpinOSO_CG: public Min {
     void vm3(const double *, const double *, double *);
     void rodrigues_rotation(const double *, double *);
     int calc_and_make_step(double, double, int);
-    int awc(double, double, double, double);
+    int adescent(double, double);
     void make_step(double, double *);
     double max_torque();
     double der_e_cur;   // current derivative along search dir.
