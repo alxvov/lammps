@@ -783,6 +783,7 @@ void NEBSpin::print_status()
   // look up GradV for the initial, final, and climbing replicas
   // these are identical to fnorm2, but to be safe we
   // take them straight from fix_neb
+  // TODO: they are not identical
 
   double gradvnorm0, gradvnorm1, gradvnormc;
 

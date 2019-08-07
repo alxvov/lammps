@@ -58,6 +58,11 @@ FixNEBSpin::FixNEBSpin(LAMMPS *lmp, int narg, char **arg) :
   if (narg < 4) error->all(FLERR,"Illegal fix neb_spin command");
 
   kspring = force->numeric(FLERR,arg[3]);
+
+  // TODO: let's define k in eV for consistency with other input parameters
+  double hbar = force->hplanck/MY_2PI;
+  kspring /= hbar;
+
   if (kspring <= 0.0) error->all(FLERR,"Illegal fix neb command");
 
   // optional params
@@ -410,12 +415,13 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
         delspyp = sp[i][1] - spprev[i][1];
         delspzp = sp[i][2] - spprev[i][2];
 
+//         TODO: don't need to do projection here
+//          as later the tangent is projected
         // project delp vector on tangent space
-
-        delndots = delspxp*sp[i][0]+delspyp*sp[i][1]+delspzp*sp[i][2];
-        delspxp -= delpdots*sp[i][0];
-        delspyp -= delpdots*sp[i][1];
-        delspzp -= delpdots*sp[i][2];
+//         delndots = delspxp*sp[i][0]+delspyp*sp[i][1]+delspzp*sp[i][2];
+//         delspxp -= delpdots*sp[i][0];
+//         delspyp -= delpdots*sp[i][1];
+//         delspzp -= delpdots*sp[i][2];
 
         // calc. prev. geodesic length
 
@@ -434,20 +440,21 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
         delspyn = spnext[i][1] - sp[i][1];
         delspzn = spnext[i][2] - sp[i][2];
 
+//         TODO: don't need to do projection here
+//          as later the tangent is projected
         // project deln vector on tangent space
-
-        delndots = delspxn*sp[i][0]+delspyn*sp[i][1]+delspzn*sp[i][2];
-        delspxn -= delndots*sp[i][0];
-        delspyn -= delndots*sp[i][1];
-        delspzn -= delndots*sp[i][2];
+//        delndots = delspxn*sp[i][0]+delspyn*sp[i][1]+delspzn*sp[i][2];
+//        delspxn -= delndots*sp[i][0];
+//        delspyn -= delndots*sp[i][1];
+//        delspzn -= delndots*sp[i][2];
 
         // evaluate best path tangent
-
-        if (vnext > veng && veng > vprev) {
+//        TODO: added equality so that the last else statement is not needed
+        if (vnext >= veng && veng > vprev) {
           tangent[i][0] = delspxn;
           tangent[i][1] = delspyn;
           tangent[i][2] = delspzn;
-        } else if (vnext < veng && veng < vprev) {
+        } else if (vnext < veng && veng <= vprev) {
           tangent[i][0] = delspxp;
           tangent[i][1] = delspyp;
           tangent[i][2] = delspzp;
@@ -456,15 +463,16 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
             tangent[i][0] = vmax*delspxn + vmin*delspxp;
             tangent[i][1] = vmax*delspyn + vmin*delspyp;
             tangent[i][2] = vmax*delspzn + vmin*delspzp;
-          } else if (vnext < vprev) {
+          } else if (vnext <= vprev) {
             tangent[i][0] = vmin*delspxn + vmax*delspxp;
             tangent[i][1] = vmin*delspyn + vmax*delspyp;
             tangent[i][2] = vmin*delspzn + vmax*delspzp;
-          } else { // vnext == vprev, e.g. for potentials that do not compute an energy
-            tangent[i][0] = delspxn + delspxp;
-            tangent[i][1] = delspyn + delspyp;
-            tangent[i][2] = delspzn + delspzp;
           }
+//          else { // vnext == vprev, e.g. for potentials that do not compute an energy
+//            tangent[i][0] = delspxn + delspxp;
+//            tangent[i][1] = delspyn + delspyp;
+//            tangent[i][2] = delspzn + delspzp;
+//          }
         }
 
         // project tangent vector on tangent space
@@ -530,35 +538,48 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
   // check projection of tangent vector on tangent space
   // and normalize it
 
-  double buftan[3];
-  double tandots;
+// TODO: i think this is redundant becuase tangent has been projected before
+//  if this projection affects on results then there is some bug above and also
+//  tlen in this case needs to be recalculated
+
+//  double buftan[3];
+//  double tandots;
+//  for (int i = 0; i < nlocal; i++)
+//    if (mask[i] & groupbit) {
+//      tandots = tangent[i][0]*sp[i][0]+tangent[i][1]*sp[i][1]+
+//        tangent[i][2]*sp[i][2];
+//      buftan[0] = tangent[i][0]-tandots*sp[i][0];
+//      buftan[1] = tangent[i][1]-tandots*sp[i][1];
+//      buftan[2] = tangent[i][2]-tandots*sp[i][2];
+//      tangent[i][0] = buftan[0];
+//      tangent[i][1] = buftan[1];
+//      tangent[i][2] = buftan[2];
+//
+//      if (tlen > 0.0) {
+//        double tleninv = 1.0/tlen;
+//        tangent[i][0] *= tleninv;
+//        tangent[i][1] *= tleninv;
+//        tangent[i][2] *= tleninv;
+//      }
+//    }
+//   normalize tangent vector
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
-      tandots = tangent[i][0]*sp[i][0]+tangent[i][1]*sp[i][1]+
-        tangent[i][2]*sp[i][2];
-      buftan[0] = tangent[i][0]-tandots*sp[i][0];
-      buftan[1] = tangent[i][1]-tandots*sp[i][1];
-      buftan[2] = tangent[i][2]-tandots*sp[i][2];
-      tangent[i][0] = buftan[0];
-      tangent[i][1] = buftan[1];
-      tangent[i][2] = buftan[2];
-
-      if (tlen > 0.0) {
-        double tleninv = 1.0/tlen;
-        tangent[i][0] *= tleninv;
-        tangent[i][1] *= tleninv;
-        tangent[i][2] *= tleninv;
-      }
+      tangent[i][0] /= tlen;
+      tangent[i][1] /= tlen;
+      tangent[i][2] /= tlen;
     }
 
   // first or last replica has no change to forces, just return
+//  TODO: we should not divide dottangrad by gradlen,
+//   also units must be in eV as the energy is in units of eV
 
   if (ireplica > 0 && ireplica < nreplica-1)
-    dottangrad = dottangrad/(tlen*gradlen);
+    dottangrad = hbar * dottangrad/tlen;
   if (ireplica == 0)
-    dottangrad = dottangrad/(nlen*gradlen);
+    dottangrad = hbar * dottangrad/nlen;
   if (ireplica == nreplica-1)
-    dottangrad = dottangrad/(plen*gradlen);
+    dottangrad = hbar * dottangrad/plen;
   if (ireplica < nreplica-1)
     dotgrad = dotgrad /(gradlen*gradnextlen);
 
