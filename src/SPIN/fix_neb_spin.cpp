@@ -35,9 +35,11 @@
 #include "memory.h"
 #include "error.h"
 #include "force.h"
+#include "math_const.h"
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
+using namespace MathConst;
 
 enum{SINGLE_PROC_DIRECT,SINGLE_PROC_MAP,MULTI_PROC};
 
@@ -573,6 +575,8 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
   // first or last replica has no change to forces, just return
 //  TODO: we should not divide dottangrad by gradlen,
 //   also units must be in eV as the energy is in units of eV
+
+  double hbar = force->hplanck/MY_2PI;
 
   if (ireplica > 0 && ireplica < nreplica-1)
     dottangrad = hbar * dottangrad/tlen;
