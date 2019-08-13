@@ -42,6 +42,7 @@ class FixNEBSpin : public Fix {
   bool StandardNEB,NEBLongRange,PerpSpring,FreeEndIni,FreeEndFinal;
   bool FreeEndFinalWithRespToEIni,FinalAndInterWithRespToEIni;
   bool SpinLattice;
+  bool EnergyWeighted;
   int ireplica,nreplica;
   int procnext,procprev;
   int cmode;

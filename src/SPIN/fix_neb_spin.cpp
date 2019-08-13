@@ -36,6 +36,7 @@
 #include "error.h"
 #include "force.h"
 #include "math_const.h"
+#include <iostream>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -77,6 +78,7 @@ FixNEBSpin::FixNEBSpin(LAMMPS *lmp, int narg, char **arg) :
   kspringIni = 1.0;
   kspringFinal = 1.0;
   SpinLattice = false;  // no spin-lattice neb for now
+  EnergyWeighted = false;
 
   // no available fix neb/spin options for now
 
@@ -92,6 +94,9 @@ FixNEBSpin::FixNEBSpin(LAMMPS *lmp, int narg, char **arg) :
       iarg += 3;
     } else if (strcmp (arg[iarg],"lattice") == 0) {
       iarg += 2;
+    } else if (strcmp (arg[iarg],"weighted") == 0) {
+      iarg += 1;
+      EnergyWeighted = true;
     } else error->all(FLERR,"Illegal fix neb command");
   }
 
@@ -603,7 +608,7 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
 
   // exit calc. if first or last replica (no gneb force)
 
-  if (ireplica == 0 || ireplica == nreplica-1) return ;
+  if ((ireplica == 0 || ireplica == nreplica-1) && !EnergyWeighted) return ;
 
   dotpath = dotpath/(plen*nlen);
 
@@ -622,24 +627,68 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
   // for intermediate replica
   // calc. GNEB force prefactor
 
-  if (ireplica == rclimber) prefactor = -2.0*dot;        // for climbing replica
-  else {
-    if (NEBLongRange) {
-      error->all(FLERR,"Long Range NEBSpin climber option not yet active");
-    } else if (StandardNEB) {
-      prefactor = -dot + kspring*(nlen-plen);
-    }
-
-    if (FinalAndInterWithRespToEIni && veng<vIni) {
-      for (int i = 0; i < nlocal; i++)
-       if (mask[i] & groupbit) {
-          fm[i][0] = 0;
-          fm[i][1] = 0;
-          fm[i][2] = 0;
-        }
-      prefactor =  kspring*(nlen-plen);
-    }
+  if (NEBLongRange) {
+    error->all(FLERR,"Long Range NEBSpin climber option not yet active");
   }
+  else if (StandardNEB) {
+    if (EnergyWeighted){
+
+      // find which end replica has maximum value and store it in v_ref
+
+      double v_ref1 = 0.0;
+      double v_ref2 = 0.0;
+      double v_ref = 0.0;
+
+      if (ireplica == 0) v_ref1 = veng;
+      else if (ireplica == nreplica-1) v_ref2 = veng;
+
+//      std::cout << ireplica << " V1= "<< v_ref1 <<"\n";
+//      std::cout << ireplica << " V2= "<< v_ref2 <<"\n";
+
+      MPI_Bcast(&v_ref1,1,MPI_DOUBLE,universe->root_proc[0],uworld);
+      MPI_Bcast(&v_ref2,1,MPI_DOUBLE,universe->root_proc[nreplica-1],uworld);
+      v_ref = MAX(v_ref1, v_ref2);
+
+//      std::cout << ireplica << " V_ref= "<< v_ref <<"\n";
+
+      // now find maximum energy along the path
+
+      double v_maxim = 0.0;
+      MPI_Allreduce(&veng, &v_maxim, 1, MPI_DOUBLE, MPI_MAX, uworld);
+
+      // and calculate two different spring constants
+      double kspr_prev = kspring;
+      double kspr_next = kspring;
+
+      if (ireplica != 0 && ireplica != nreplica-1){
+        double v_i = MAX(veng, vprev);
+        if (v_i >= v_ref)
+          kspr_prev = 2.0 * kspring - kspring * (v_maxim - v_i) / (v_maxim - v_ref);
+        v_i = MAX(veng, vnext);
+        if (v_i >= v_ref)
+          kspr_next = 2.0 * kspring - kspring * (v_maxim - v_i) / (v_maxim - v_ref);
+
+        prefactor = -dot + kspr_next*nlen-kspr_prev*plen;
+      }
+      else{
+        prefactor = 0.0;
+      }
+
+    } else prefactor = -dot + kspring*(nlen-plen);
+  }
+  if (FinalAndInterWithRespToEIni && veng<vIni) {
+    for (int i = 0; i < nlocal; i++)
+     if (mask[i] & groupbit) {
+        fm[i][0] = 0;
+        fm[i][1] = 0;
+        fm[i][2] = 0;
+      }
+    prefactor =  kspring*(nlen-plen);
+  }
+  if (ireplica == rclimber) prefactor = -2.0*dot;        // for climbing replica
+
+  // exit calc. if first or last replica (no gneb force)
+  if (ireplica == 0 || ireplica == nreplica-1) return ;
 
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
