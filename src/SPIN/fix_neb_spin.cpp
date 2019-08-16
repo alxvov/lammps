@@ -423,7 +423,7 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
         delspzp = sp[i][2] - spprev[i][2];
 
 //         TODO: don't need to do projection here
-//          as later the tangent is projected
+//          as the tangent is projected later
         // project delp vector on tangent space
 //         delndots = delspxp*sp[i][0]+delspyp*sp[i][1]+delspzp*sp[i][2];
 //         delspxp -= delpdots*sp[i][0];
@@ -448,7 +448,7 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
         delspzn = spnext[i][2] - sp[i][2];
 
 //         TODO: don't need to do projection here
-//          as later the tangent is projected
+//          as the tangent is projected later
         // project deln vector on tangent space
 //        delndots = delspxn*sp[i][0]+delspyn*sp[i][1]+delspzn*sp[i][2];
 //        delspxn -= delndots*sp[i][0];

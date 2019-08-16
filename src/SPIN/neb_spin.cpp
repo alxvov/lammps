@@ -47,6 +47,7 @@
 #include "utils.h"
 
 using namespace LAMMPS_NS;
+using namespace MathConst;
 
 static const char cite_neb_spin[] =
   "neb/spin command:\n\n"
@@ -748,6 +749,10 @@ void NEBSpin::print_status()
   MPI_Allreduce(&local_norm_inf,&fnorminf,1,MPI_DOUBLE,MPI_MAX,world);
   double fmaxatom;
   MPI_Allreduce(&fnorminf,&fmaxatom,1,MPI_DOUBLE,MPI_MAX,roots);
+
+  double hbar = force->hplanck/MY_2PI;
+  fmaxatom *= hbar;
+  fmaxreplica *= hbar;
 
   if (verbose) {
     freplica = new double[nreplica];
