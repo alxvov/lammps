@@ -174,7 +174,7 @@ int FixPrecessionSpin::setmask()
 void FixPrecessionSpin::init()
 {
   const double hbar = force->hplanck/MY_2PI;    // eV/(rad.THz)
-  const double mub = 5.78901e-5;                // in eV/T
+  const double mub = 5.7883818012e-5 // 5.78901e-5;// in eV/T
   const double gyro = mub/hbar;                 // in rad.THz/T
 
   // convert field quantities to rad.THz
