@@ -602,7 +602,7 @@ int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction)
   // if knormsq == 0.0, init and final spins are aligned
   // Rodrigues' formula breaks, needs to define another axis k
 
-  if (knormsq == 0.0) {
+  if (knormsq < 1.0e-5) {
     if (sidotsf > 0.0) { 	// spins aligned and in same direction
       return 0;
     } else if (sidotsf < 0.0) {	// spins aligned and in opposite directions
