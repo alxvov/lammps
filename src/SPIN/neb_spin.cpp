@@ -106,8 +106,8 @@ void NEBSpin::command(int narg, char **arg)
   if (etol < 0.0) error->all(FLERR,"Illegal NEBSpin command");
   if (ttol < 0.0) error->all(FLERR,"Illegal NEBSpin command");
   if (nevery <= 0) error->universe_all(FLERR,"Illegal NEBSpin command");
-  if (n1steps % nevery || n2steps % nevery)
-    error->universe_all(FLERR,"Illegal NEBSpin command");
+  //  if (n1steps % nevery || n2steps % nevery)
+  //    error->universe_all(FLERR,"Illegal NEBSpin command");
 
   // replica info
 
@@ -247,9 +247,17 @@ void NEBSpin::run()
   timer->barrier_start();
 
   // if(ireplica != 0 && ireplica != nreplica -1)
-
+  int nevery_2 = 0;
+  int niter = 0;
   while (update->minimize->niter < n1steps) {
-    update->minimize->run(nevery);
+    niter = update->minimize->niter;
+    if (niter + nevery < n1steps ){
+      nevery_2 = nevery;
+    }
+    else{
+      nevery_2 = n1steps - niter;
+    }
+    update->minimize->run(nevery_2);
     print_status();
     if (update->minimize->stop_condition) break;
   }
@@ -334,8 +342,17 @@ void NEBSpin::run()
   timer->init();
   timer->barrier_start();
 
+  nevery_2 = 0;
+  niter = 0;
   while (update->minimize->niter < n2steps) {
-    update->minimize->run(nevery);
+    niter = update->minimize->niter;
+    if (niter + nevery < n2steps ){
+      nevery_2 = nevery;
+    }
+    else{
+      nevery_2 = n2steps - niter;
+    }
+    update->minimize->run(nevery_2);
     print_status();
     if (update->minimize->stop_condition) break;
   }
