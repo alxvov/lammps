@@ -663,10 +663,10 @@ void FixNEBSpin::min_post_force(int /*vflag*/)
       if (ireplica != 0 && ireplica != nreplica-1){
         double v_i = MAX(veng, vprev);
         if (v_i >= v_ref)
-          kspr_prev = 2.0 * kspring - kspring * (v_maxim - v_i) / (v_maxim - v_ref);
+          kspr_prev = 2.0 * kspring - kspring * (v_maxim - v_i + 1.0e-6) / (v_maxim - v_ref + 1.0e-6);
         v_i = MAX(veng, vnext);
         if (v_i >= v_ref)
-          kspr_next = 2.0 * kspring - kspring * (v_maxim - v_i) / (v_maxim - v_ref);
+          kspr_next = 2.0 * kspring - kspring * (v_maxim - v_i + 1.0e-6) / (v_maxim - v_ref + 1.0e-6);
 
         prefactor = -dot + kspr_next*nlen-kspr_prev*plen;
       }
