@@ -354,6 +354,15 @@ void NEBSpin::run()
     }
     update->minimize->run(nevery_2);
     print_status();
+
+    vmax = all[0][0];
+    top = 0;
+    for (int m = 1; m < nreplica; m++)
+      if (vmax < all[m][0]) {
+        vmax = all[m][0];
+        top = m;
+      }
+
     if (update->minimize->stop_condition) break;
   }
 
