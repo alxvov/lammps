@@ -423,9 +423,13 @@ void PairSpinDmi::compute_dmi(int i, int j, double eij[3], double fmi[3], double
   itype = type[i];
   jtype = type[j];
 
-  dmix = eij[1]*v_dmz[itype][jtype] - eij[2]*v_dmy[itype][jtype];
-  dmiy = eij[2]*v_dmx[itype][jtype] - eij[0]*v_dmz[itype][jtype];
-  dmiz = eij[0]*v_dmy[itype][jtype] - eij[1]*v_dmx[itype][jtype];
+    dmix = -eij[0] * DM[itype][jtype]/hbar;
+    dmiy = -eij[1] * DM[itype][jtype]/hbar;
+    dmiz = -eij[2] * DM[itype][jtype]/hbar;
+
+//  dmix = eij[1]*v_dmz[itype][jtype] - eij[2]*v_dmy[itype][jtype];
+//  dmiy = eij[2]*v_dmx[itype][jtype] - eij[0]*v_dmz[itype][jtype];
+//  dmiz = eij[0]*v_dmy[itype][jtype] - eij[1]*v_dmx[itype][jtype];
 
   fmi[0] -= 2.0*(dmiy*spj[2] - dmiz*spj[1]);
   fmi[1] -= 2.0*(dmiz*spj[0] - dmix*spj[2]);
