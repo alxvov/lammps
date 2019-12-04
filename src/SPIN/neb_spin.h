@@ -55,7 +55,7 @@ class NEBSpin : protected Pointers {
   double *fmaxatomInRepl;      // force on an image
 
   void readfile(char *, int);
-  int initial_rotation(double *, double *, double);
+  int initial_rotation(double *, double *, double, double *);
   void open(char *);
   void print_status();
 };

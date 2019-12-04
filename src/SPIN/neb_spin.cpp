@@ -45,6 +45,7 @@
 #include "error.h"
 #include "math_const.h"
 #include "utils.h"
+#include "random_park.h"
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -457,6 +458,10 @@ void NEBSpin::readfile(char *file, int flag)
   int temp_flag,rot_flag;
   temp_flag = rot_flag = 0;
   int nread = 0;
+
+
+  class RanPark *random = new RanPark(lmp, 1 + comm->me);
+
   while (nread < nlines) {
     nchunk = MIN(nlines-nread,CHUNK);
     if (flag == 0)
@@ -528,7 +533,13 @@ void NEBSpin::readfile(char *file, int flag)
 	    sp[m][1] = spfinal[1];
 	    sp[m][2] = spfinal[2];
 	  } else {
-            temp_flag = initial_rotation(spinit,spfinal,fraction);
+
+	          double randrot[3] = {0.0, 0.0, 0.0};
+	          randrot[0] = (2.0*random->uniform()-1.0) * 1.0e-2;
+            randrot[1] = (2.0*random->uniform()-1.0) * 1.0e-2;
+            randrot[2] = (2.0*random->uniform()-1.0) * 1.0e-2;
+            temp_flag = initial_rotation(spinit,spfinal,fraction, randrot);
+
             rot_flag = MAX(temp_flag,rot_flag);
 	    sp[m][0] = spfinal[0];
 	    sp[m][1] = spfinal[1];
@@ -550,6 +561,8 @@ void NEBSpin::readfile(char *file, int flag)
 
     nread += nchunk;
   }
+
+  delete random;
 
   // warning message if one or more couples (spi,spf) were aligned
   // this breaks Rodrigues' formula, and an arbitrary rotation
@@ -595,7 +608,8 @@ void NEBSpin::readfile(char *file, int flag)
    interpolates between initial (spi) and final (stored in sploc)
 ------------------------------------------------------------------------- */
 
-int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction)
+int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction,
+        double *randrot)
 {
 
   // no interpolation for initial and final replica
@@ -653,6 +667,10 @@ int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction)
   }
 
   // knormsq should not be 0
+
+  kx += randrot[0];
+  ky += randrot[1];
+  kz += randrot[2];
 
   if (knormsq == 0.0)
     error->all(FLERR,"Incorrect initial rotation operation");

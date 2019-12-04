@@ -85,14 +85,23 @@ FixPrecessionSpin::FixPrecessionSpin(LAMMPS *lmp, int narg, char **arg) : Fix(lm
       nhz = force->numeric(FLERR,arg[iarg+4]);
       iarg += 5;
     } else if (strcmp(arg[iarg],"anisotropy") == 0) {
-      if (iarg+4 > narg) error->all(FLERR,"Illegal fix precession/spin command");
+      if (iarg + 4 > narg) error->all(FLERR, "Illegal fix precession/spin command");
       aniso_flag = 1;
-      Ka = force->numeric(FLERR,arg[iarg+1]);
-      nax = force->numeric(FLERR,arg[iarg+2]);
-      nay = force->numeric(FLERR,arg[iarg+3]);
-      naz = force->numeric(FLERR,arg[iarg+4]);
+      Ka = force->numeric(FLERR, arg[iarg + 1]);
+      nax = force->numeric(FLERR, arg[iarg + 2]);
+      nay = force->numeric(FLERR, arg[iarg + 3]);
+      naz = force->numeric(FLERR, arg[iarg + 4]);
       iarg += 5;
-    } else if (strcmp(arg[iarg],"cubic") == 0) {
+    } else if (strcmp(arg[iarg],"anisotropy2") == 0) {
+      if (iarg+4 > narg) error->all(FLERR,"Illegal fix precession/spin command");
+      aniso2_flag = 1;
+      Ka2 = force->numeric(FLERR,arg[iarg+1]);
+      na2x = force->numeric(FLERR,arg[iarg+2]);
+      na2y = force->numeric(FLERR,arg[iarg+3]);
+      na2z = force->numeric(FLERR,arg[iarg+4]);
+      iarg += 5;
+    }
+    else if (strcmp(arg[iarg],"cubic") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal fix precession/spin command");
       cubic_flag = 1;
       k1c = force->numeric(FLERR,arg[iarg+1]);
@@ -126,7 +135,15 @@ FixPrecessionSpin::FixPrecessionSpin(LAMMPS *lmp, int narg, char **arg) : Fix(lm
     nay *= inorm;
     naz *= inorm;
   }
-  
+
+  if (aniso2_flag) {
+    inorm = 1.0/sqrt(na2x*na2x + na2y*na2y + na2z*na2z);
+    na2x *= inorm;
+    na2y *= inorm;
+    na2z *= inorm;
+  }
+
+
   if (cubic_flag) {
     inorm = 1.0/sqrt(nc1x*nc1x + nc1y*nc1y + nc1z*nc1z);
     nc1x *= inorm;
@@ -181,6 +198,8 @@ void FixPrecessionSpin::init()
 
   H_field *= gyro;
   Kah = Ka/hbar;
+  Ka2h = Ka2/hbar;
+
   k1ch = k1c/hbar;
   k2ch = k2c/hbar;
 
@@ -265,6 +284,12 @@ void FixPrecessionSpin::post_force(int /* vflag */)
         epreci -= compute_anisotropy_energy(spi);
       }
 
+      if (aniso2_flag) {           // compute magnetic anisotropy
+        compute_anisotropy2(spi,fmi);
+        epreci -= compute_anisotropy2_energy(spi);
+      }
+
+
       if (cubic_flag) {		// compute cubic anisotropy
 	compute_cubic(spi,fmi);
 	epreci -= compute_cubic_energy(spi);
@@ -286,6 +311,7 @@ void FixPrecessionSpin::compute_single_precession(int i, double spi[3], double f
   if (mask[i] & groupbit) {
     if (zeeman_flag) compute_zeeman(i,fmi);
     if (aniso_flag) compute_anisotropy(spi,fmi);
+    if (aniso2_flag) compute_anisotropy2(spi,fmi);
     if (cubic_flag) compute_cubic(spi,fmi);
   }
 }
@@ -312,12 +338,29 @@ void FixPrecessionSpin::compute_anisotropy(double spi[3], double fmi[3])
 
 /* ---------------------------------------------------------------------- */
 
+void FixPrecessionSpin::compute_anisotropy2(double spi[3], double fmi[3])
+{
+  double scalar = na2x*spi[0] + na2y*spi[1] + na2z*spi[2];
+  fmi[0] += scalar*Ka2x;
+  fmi[1] += scalar*Ka2y;
+  fmi[2] += scalar*Ka2z;
+}
+
+/* ---------------------------------------------------------------------- */
+
 double FixPrecessionSpin::compute_anisotropy_energy(double spi[3])
 {
   double energy = 0.0;
   double scalar = nax*spi[0] + nay*spi[1] + naz*spi[2];
   energy = Ka*scalar*scalar;
   return energy; 
+}
+
+double FixPrecessionSpin::compute_anisotropy2_energy(double spi[3]) {
+  double energy = 0.0;
+  double scalar = na2x * spi[0] + na2y * spi[1] + na2z * spi[2];
+  energy = Ka2 * scalar * scalar;
+  return energy;
 }
 
 /* ---------------------------------------------------------------------- */

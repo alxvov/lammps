@@ -39,7 +39,7 @@ class FixPrecessionSpin : public Fix {
   void min_post_force(int);
   double compute_scalar();
 
-  int zeeman_flag, aniso_flag, cubic_flag;
+  int zeeman_flag, aniso_flag, aniso2_flag, cubic_flag;
   void compute_single_precession(int, double *, double *);
   void compute_zeeman(int, double *);
   
@@ -47,6 +47,9 @@ class FixPrecessionSpin : public Fix {
 
   void compute_anisotropy(double *, double *);
   double compute_anisotropy_energy(double *);
+
+  void compute_anisotropy2(double *, double *);
+  double compute_anisotropy2_energy(double *);
 
   // cubic aniso calculations
 
@@ -80,6 +83,12 @@ class FixPrecessionSpin : public Fix {
   double Kah;			// aniso const. in rad.THz
   double nax, nay, naz;
   double Kax, Kay, Kaz; 	// temp. force variables
+
+  double Ka2;			// aniso const. in eV
+  double Ka2h;			// aniso const. in rad.THz
+  double na2x, na2y, na2z;
+  double Ka2x, Ka2y, Ka2z; 	// temp. force variables
+
 
   // cubic anisotropy intensity
 
