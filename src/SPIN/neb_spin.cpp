@@ -668,9 +668,9 @@ int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction,
 
   // knormsq should not be 0
 
-  kx += randrot[0];
-  ky += randrot[1];
-  kz += randrot[2];
+  kx += 0.0 * randrot[0];
+  ky += 0.0 * randrot[1];
+  kz += 0.0 * randrot[2];
 
   if (knormsq == 0.0)
     error->all(FLERR,"Incorrect initial rotation operation");
