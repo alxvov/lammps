@@ -769,30 +769,31 @@ void NEBSpin::print_status()
 {
   int nlocal = atom->nlocal;
   double tx,ty,tz;
-  double tnorm2,local_norm_inf,temp_inf;
+  double tnorm2, local_norm_max,temp_max;
   double **sp = atom->sp;
   double **fm = atom->fm;
 
   // calc. magnetic torques
 
-  tnorm2 = local_norm_inf = temp_inf = 0.0;
+  tnorm2 = local_norm_max = temp_max = 0.0;
   for (int i = 0; i < nlocal; i++) {
     tx = (fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]);
     ty = (fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]);
     tz = (fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]);
-    tnorm2 += tx*tx + ty*ty + tz*tz;
-    temp_inf = MAX(fabs(tx),fabs(ty));
-    temp_inf = MAX(fabs(tz),temp_inf);
-    local_norm_inf = MAX(temp_inf,local_norm_inf);
+    temp_max = tx*tx + ty*ty + tz*tz;
+    tnorm2 += temp_max;
+    local_norm_max = MAX(temp_max,local_norm_max);
   }
+
+  local_norm_max = sqrt(local_norm_max);
 
   double fmaxreplica;
   MPI_Allreduce(&tnorm2,&fmaxreplica,1,MPI_DOUBLE,MPI_MAX,roots);
 
-  double fnorminf = 0.0;
-  MPI_Allreduce(&local_norm_inf,&fnorminf,1,MPI_DOUBLE,MPI_MAX,world);
+  double fnormmax = 0.0;
+  MPI_Allreduce(&local_norm_max,&fnormmax,1,MPI_DOUBLE,MPI_MAX,world);
   double fmaxatom;
-  MPI_Allreduce(&fnorminf,&fmaxatom,1,MPI_DOUBLE,MPI_MAX,roots);
+  MPI_Allreduce(&fnormmax,&fmaxatom,1,MPI_DOUBLE,MPI_MAX,roots);
 
   double hbar = force->hplanck/MY_2PI;
   fmaxatom *= hbar;
@@ -802,7 +803,7 @@ void NEBSpin::print_status()
     freplica = new double[nreplica];
     MPI_Allgather(&tnorm2,1,MPI_DOUBLE,&freplica[0],1,MPI_DOUBLE,roots);
     fmaxatomInRepl = new double[nreplica];
-    MPI_Allgather(&fnorminf,1,MPI_DOUBLE,&fmaxatomInRepl[0],1,MPI_DOUBLE,roots);
+    MPI_Allgather(&fnormmax,1,MPI_DOUBLE,&fmaxatomInRepl[0],1,MPI_DOUBLE,roots);
   }
 
   double one[7];
