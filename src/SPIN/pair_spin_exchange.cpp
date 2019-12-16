@@ -407,6 +407,8 @@ void PairSpinExchange::compute_exchange(int i, int j, double rsq, double fmi[3],
 
 //  printf("r = %lf, J_1 = %lf\n", sqrt(rsq), Jex * hbar * 1000);
 
+  double J_1 = 14.40665905 * 2.0;
+
   double a =  11.58517753e-3/hbar;
   double b = 2.497316368;
   double c = 8.07128957e-3/hbar;
@@ -415,6 +417,7 @@ void PairSpinExchange::compute_exchange(int i, int j, double rsq, double fmi[3],
 
   Jex = a * sin(b * sqrt(rsq)) / rsq  + c * sd * sd * sd/ rsq;
 
+  Jex /= J_1;
 //  printf("r = %lf, J_2 = %lf\n", sqrt(rsq), Jex * hbar * 1000);
 
   fmi[0] += 2.0*Jex*spj[0];
