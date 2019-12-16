@@ -535,9 +535,9 @@ void NEBSpin::readfile(char *file, int flag)
 	  } else {
 
 	          double randrot[3] = {0.0, 0.0, 0.0};
-	          randrot[0] = (2.0*random->uniform()-1.0) * 1.0e-2;
-            randrot[1] = (2.0*random->uniform()-1.0) * 1.0e-2;
-            randrot[2] = (2.0*random->uniform()-1.0) * 1.0e-2;
+	          randrot[0] = (2.0*random->uniform()-1.0) * 1.0e-1;
+            randrot[1] = (2.0*random->uniform()-1.0) * 1.0e-1;
+            randrot[2] = (2.0*random->uniform()-1.0) * 1.0e-1;
             temp_flag = initial_rotation(spinit,spfinal,fraction, randrot);
 
             rot_flag = MAX(temp_flag,rot_flag);
@@ -668,9 +668,9 @@ int NEBSpin::initial_rotation(double *spi, double *sploc, double fraction,
 
   // knormsq should not be 0
 
-  kx += randrot[0];
-  ky += randrot[1];
-  kz += randrot[2];
+  kx += 0.0 * randrot[0];
+  ky += 0.0 * randrot[1];
+  kz += 0.0 * randrot[2];
 
   if (knormsq == 0.0)
     error->all(FLERR,"Incorrect initial rotation operation");
