@@ -363,7 +363,7 @@ void NEBSpin::run()
         vmax = all[m][0];
         top = m;
       }
-
+    fneb->rclimber = top;
     if (update->minimize->stop_condition) break;
   }
 

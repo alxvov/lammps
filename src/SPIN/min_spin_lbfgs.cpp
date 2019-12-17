@@ -372,8 +372,9 @@ void MinSpinLBFGS::calc_search_direction()
     factor = 1.0;
   }
 
-  if (local_iter == 0){ 	// steepest descent direction
+  if (local_iter == 0 || local_iter % 10 == 0){ 	// steepest descent direction
 
+    local_iter = 0;
     //if no line search then calculate maximum rotation
     if (use_line_search == 0)
       scaling = maximum_rotation(g_cur);
