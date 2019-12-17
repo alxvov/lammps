@@ -63,7 +63,7 @@ static const char cite_minstyle_spin_vpo[] =
 /* ---------------------------------------------------------------------- */
 
 MinSpinVPO::MinSpinVPO(LAMMPS *lmp) :
-  Min(lmp), g_old(NULL), g_cur(NULL), p_s(NULL), sp_copy(NULL)
+  Min(lmp), g_old(NULL), g_cur(NULL), p_s(NULL), eff_vel(NULL), sp_copy(NULL)
 {
   if (lmp->citeme) lmp->citeme->add(cite_minstyle_spin_vpo);
   nlocal_max = 0;
