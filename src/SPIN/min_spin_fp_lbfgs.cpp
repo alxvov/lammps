@@ -25,7 +25,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include "min_spin_lbfgs.h"
+#include "min_spin_fp_lbfgs.h"
 #include "atom.h"
 #include "citeme.h"
 #include "comm.h"
@@ -43,8 +43,8 @@
 using namespace LAMMPS_NS;
 using namespace MathConst;
 
-static const char cite_minstyle_spin_lbfgs[] =
-  "min_style spin/lbfgs command:\n\n"
+static const char cite_minstyle_spin_fp_lbfgs[] =
+  "min_style spin/fp_lbfgs command:\n\n"
   "@article{ivanov2019fast,\n"
   "title={Fast and Robust Algorithm for the Minimisation of the Energy of "
   "Spin Systems},\n"
@@ -61,10 +61,10 @@ static const char cite_minstyle_spin_lbfgs[] =
 
 /* ---------------------------------------------------------------------- */
 
-MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
+MinSpinFP_LBFGS::MinSpinFP_LBFGS(LAMMPS *lmp) :
   Min(lmp), g_old(NULL), g_cur(NULL), p_s(NULL), rho(NULL),  alpha(NULL), ds(NULL), dy(NULL), sp_copy(NULL)
 {
-  if (lmp->citeme) lmp->citeme->add(cite_minstyle_spin_lbfgs);
+  if (lmp->citeme) lmp->citeme->add(cite_minstyle_spin_fp_lbfgs);
   nlocal_max = 0;
 
   // nreplica = number of partitions
@@ -72,7 +72,7 @@ MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
 
   nreplica = universe->nworlds;
   ireplica = universe->iworld;
-  use_line_search = 0;  // no line search as default option for LBFGS
+  use_line_search = 0;  // no line search as default option for FP_LBFGS
 
   maxepsrot = MY_2PI / (100.0);
 
@@ -80,7 +80,7 @@ MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
 
 /* ---------------------------------------------------------------------- */
 
-MinSpinLBFGS::~MinSpinLBFGS()
+MinSpinFP_LBFGS::~MinSpinFP_LBFGS()
 {
     memory->destroy(g_old);
     memory->destroy(g_cur);
@@ -95,7 +95,7 @@ MinSpinLBFGS::~MinSpinLBFGS()
 
 /* ---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::init()
+void MinSpinFP_LBFGS::init()
 {
   num_mem = 3;
   local_iter = 0;
@@ -123,21 +123,21 @@ void MinSpinLBFGS::init()
   // allocate tables
 
   nlocal_max = atom->nlocal;
-  memory->grow(g_old,3*nlocal_max,"min/spin/lbfgs:g_old");
-  memory->grow(g_cur,3*nlocal_max,"min/spin/lbfgs:g_cur");
-  memory->grow(p_s,3*nlocal_max,"min/spin/lbfgs:p_s");
-  memory->grow(rho,num_mem,"min/spin/lbfgs:rho");
-  memory->grow(alpha,num_mem,"min/spin/lbfgs:alpha");
-  memory->grow(ds,num_mem,3*nlocal_max,"min/spin/lbfgs:ds");
-  memory->grow(dy,num_mem,3*nlocal_max,"min/spin/lbfgs:dy");
+  memory->grow(g_old,3*nlocal_max,"min/spin/fp_lbfgs:g_old");
+  memory->grow(g_cur,3*nlocal_max,"min/spin/fp_lbfgs:g_cur");
+  memory->grow(p_s,3*nlocal_max,"min/spin/fp_lbfgs:p_s");
+  memory->grow(rho,num_mem,"min/spin/fp_lbfgs:rho");
+  memory->grow(alpha,num_mem,"min/spin/fp_lbfgs:alpha");
+  memory->grow(ds,num_mem,3*nlocal_max,"min/spin/fp_lbfgs:ds");
+  memory->grow(dy,num_mem,3*nlocal_max,"min/spin/fp_lbfgs:dy");
   if (use_line_search)
-    memory->grow(sp_copy,nlocal_max,3,"min/spin/lbfgs:sp_copy");
+    memory->grow(sp_copy,nlocal_max,3,"min/spin/fp_lbfgs:sp_copy");
 
 }
 
 /* ---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::setup_style()
+void MinSpinFP_LBFGS::setup_style()
 {
   double **v = atom->v;
   int nlocal = atom->nlocal;
@@ -145,7 +145,7 @@ void MinSpinLBFGS::setup_style()
   // check if the atom/spin style is defined
 
   if (!atom->sp_flag)
-    error->all(FLERR,"min spin/lbfgs requires atom/spin style");
+    error->all(FLERR,"min spin/fp_lbfgs requires atom/spin style");
 
   for (int i = 0; i < nlocal; i++)
     v[i][0] = v[i][1] = v[i][2] = 0.0;
@@ -153,7 +153,7 @@ void MinSpinLBFGS::setup_style()
 
 /* ---------------------------------------------------------------------- */
 
-int MinSpinLBFGS::modify_param(int narg, char **arg)
+int MinSpinFP_LBFGS::modify_param(int narg, char **arg)
 {
   if (strcmp(arg[0],"discrete_factor") == 0) {
     if (narg < 2) error->all(FLERR,"Illegal min_modify command");
@@ -170,7 +170,7 @@ int MinSpinLBFGS::modify_param(int narg, char **arg)
    called after atoms have migrated
 ------------------------------------------------------------------------- */
 
-void MinSpinLBFGS::reset_vectors()
+void MinSpinFP_LBFGS::reset_vectors()
 {
   // atomic dof
 
@@ -189,7 +189,7 @@ void MinSpinLBFGS::reset_vectors()
    minimization via damped spin dynamics
 ------------------------------------------------------------------------- */
 
-int MinSpinLBFGS::iterate(int maxiter)
+int MinSpinFP_LBFGS::iterate(int maxiter)
 {
   int nlocal = atom->nlocal;
   bigint ntimestep;
@@ -201,15 +201,15 @@ int MinSpinLBFGS::iterate(int maxiter)
   if (nlocal_max < nlocal) {
     nlocal_max = nlocal;
     local_iter = 0;
-    memory->grow(g_old,3*nlocal_max,"min/spin/lbfgs:g_old");
-    memory->grow(g_cur,3*nlocal_max,"min/spin/lbfgs:g_cur");
-    memory->grow(p_s,3*nlocal_max,"min/spin/lbfgs:p_s");
-    memory->grow(rho,num_mem,"min/spin/lbfgs:rho");
-    memory->grow(alpha,num_mem,"min/spin/lbfgs:alpha");
-    memory->grow(ds,num_mem,3*nlocal_max,"min/spin/lbfgs:ds");
-    memory->grow(dy,num_mem,3*nlocal_max,"min/spin/lbfgs:dy");
+    memory->grow(g_old,3*nlocal_max,"min/spin/fp_lbfgs:g_old");
+    memory->grow(g_cur,3*nlocal_max,"min/spin/fp_lbfgs:g_cur");
+    memory->grow(p_s,3*nlocal_max,"min/spin/fp_lbfgs:p_s");
+    memory->grow(rho,num_mem,"min/spin/fp_lbfgs:rho");
+    memory->grow(alpha,num_mem,"min/spin/fp_lbfgs:alpha");
+    memory->grow(ds,num_mem,3*nlocal_max,"min/spin/fp_lbfgs:ds");
+    memory->grow(dy,num_mem,3*nlocal_max,"min/spin/fp_lbfgs:dy");
     if (use_line_search)
-      memory->grow(sp_copy,nlocal_max,3,"min/spin/lbfgs:sp_copy");
+      memory->grow(sp_copy,nlocal_max,3,"min/spin/fp_lbfgs:sp_copy");
   }
 
   for (int iter = 0; iter < maxiter; iter++) {
@@ -319,19 +319,22 @@ int MinSpinLBFGS::iterate(int maxiter)
    calculate gradients
 ---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::calc_gradient()
+void MinSpinFP_LBFGS::calc_gradient()
 {
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
   double **fm = atom->fm;
   double hbar = force->hplanck/MY_2PI;
 
+  double dot_prod = 0.0;
   // loop on all spins on proc.
 
   for (int i = 0; i < nlocal; i++) {
-    g_cur[3 * i + 0] = (fm[i][0]*sp[i][1] - fm[i][1]*sp[i][0]) * hbar;
-    g_cur[3 * i + 1] = -(fm[i][2]*sp[i][0] - fm[i][0]*sp[i][2]) * hbar;
-    g_cur[3 * i + 2] = (fm[i][1]*sp[i][2] - fm[i][2]*sp[i][1]) * hbar;
+    dot_prod = 0.0;
+    for (int cc = 0; cc < 3; cc++)
+      dot_prod += fm[i][cc]*sp[i][cc];
+    for (int cc = 0; cc < 3; cc++)
+      g_cur[3 * i + cc] = -(fm[i][cc] - dot_prod*sp[i][cc]) * hbar;
   }
 }
 
@@ -342,7 +345,7 @@ void MinSpinLBFGS::calc_gradient()
    Optimization' Second Edition, 2006 (p. 177)
 ---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::calc_search_direction()
+void MinSpinFP_LBFGS::calc_search_direction()
 {
   int nlocal = atom->nlocal;
 
@@ -359,6 +362,8 @@ void MinSpinLBFGS::calc_search_direction()
 
   int m_index = local_iter % num_mem; // memory index
   int c_ind = 0;
+//  double *q;
+//  double *alpha;
 
   double factor;
   double scaling = 1.0;
@@ -412,6 +417,9 @@ void MinSpinLBFGS::calc_search_direction()
       local_iter = 0;
       return calc_search_direction();
     }
+//    q = (double *) calloc(3*nlocal, sizeof(double));
+//    alpha = (double *) calloc(num_mem, sizeof(double));
+    // set the q vector
 
     for (int i = 0; i < 3 * nlocal; i++) {
       p_s[i] = g_cur[i];
@@ -503,6 +511,8 @@ void MinSpinLBFGS::calc_search_direction()
       p_s[i] = - factor * p_s[i] * scaling;
       g_old[i] = g_cur[i] * factor;
     }
+//    free(q);
+//    free(alpha);
   }
   local_iter++;
 }
@@ -511,108 +521,23 @@ void MinSpinLBFGS::calc_search_direction()
    rotation of spins along the search direction
 ---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::advance_spins()
-{
+void MinSpinFP_LBFGS::advance_spins() {
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
-  double rot_mat[9]; // exponential of matrix made of search direction
-  double s_new[3];
-
+  double dot_ss = 0.0;
   // loop on all spins on proc.
-
   for (int i = 0; i < nlocal; i++) {
-    rodrigues_rotation(p_s + 3 * i, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
-  }
-}
-
-/* ----------------------------------------------------------------------
-  calculate 3x3 matrix exponential using Rodrigues' formula
-  (R. Murray, Z. Li, and S. Shankar Sastry,
-  A Mathematical Introduction to
-  Robotic Manipulation (1994), p. 28 and 30).
-
-  upp_tr - vector x, y, z so that one calculate
-  U = exp(A) with A= [[0, x, y],
-                      [-x, 0, z],
-                      [-y, -z, 0]]
-------------------------------------------------------------------------- */
-
-void MinSpinLBFGS::rodrigues_rotation(const double *upp_tr, double *out)
-{
-  double theta,A,B,D,x,y,z;
-  double s1,s2,s3,a1,a2,a3;
-
-  if (fabs(upp_tr[0]) < 1.0e-40 &&
-      fabs(upp_tr[1]) < 1.0e-40 &&
-      fabs(upp_tr[2]) < 1.0e-40){
-
-    // if upp_tr is zero, return unity matrix
-    for(int k = 0; k < 3; k++){
-      for(int m = 0; m < 3; m++){
-    if (m == k) out[3 * k + m] = 1.0;
-    else out[3 * k + m] = 0.0;
-        }
+    dot_ss = 0.0;
+    for (int cc = 0; cc < 3; cc++) {
+      sp[i][cc] += p_s[3 * i + cc];
+      dot_ss += sp[i][cc] * sp[i][cc];
     }
-    return;
-  }
-
-  theta = sqrt(upp_tr[0] * upp_tr[0] +
-               upp_tr[1] * upp_tr[1] +
-               upp_tr[2] * upp_tr[2]);
-
-  A = cos(theta);
-  B = sin(theta);
-  D = 1 - A;
-  x = upp_tr[0]/theta;
-  y = upp_tr[1]/theta;
-  z = upp_tr[2]/theta;
-
-  // diagonal elements of U
-
-  out[0] = A + z * z * D;
-  out[4] = A + y * y * D;
-  out[8] = A + x * x * D;
-
-  // off diagonal of U
-
-  s1 = -y * z *D;
-  s2 = x * z * D;
-  s3 = -x * y * D;
-
-  a1 = x * B;
-  a2 = y * B;
-  a3 = z * B;
-
-  out[1] = s1 + a1;
-  out[3] = s1 - a1;
-  out[2] = s2 + a2;
-  out[6] = s2 - a2;
-  out[5] = s3 + a3;
-  out[7] = s3 - a3;
-
-}
-
-/* ----------------------------------------------------------------------
-  out = vector^T x m,
-  m -- 3x3 matrix , v -- 3-d vector
-------------------------------------------------------------------------- */
-
-void MinSpinLBFGS::vm3(const double *m, const double *v, double *out)
-{
-  for(int i = 0; i < 3; i++){
-    out[i] = 0.0;
-    for(int j = 0; j < 3; j++)
-    out[i] += *(m + 3 * j + i) * v[j];
+    for (int cc = 0; cc < 3; cc++)
+      sp[i][cc] /= sqrt(dot_ss);
   }
 }
 
-
-void MinSpinLBFGS::make_step(double c, double *energy_and_der)
+void MinSpinFP_LBFGS::make_step(double c, double *energy_and_der)
 {
   double p_scaled[3];
   int nlocal = atom->nlocal;
@@ -621,20 +546,19 @@ void MinSpinLBFGS::make_step(double c, double *energy_and_der)
   double **sp = atom->sp;
   double der_e_cur_tmp = 0.0;
 
+  double dot_ss = 0.0;
+  // loop on all spins on proc.
   for (int i = 0; i < nlocal; i++) {
-
     // scale the search direction
-
     for (int j = 0; j < 3; j++) p_scaled[j] = c * p_s[3 * i + j];
 
-    // calculate rotation matrix
-
-    rodrigues_rotation(p_scaled, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
+    dot_ss = 0.0;
+    for (int cc = 0; cc < 3; cc++) {
+      sp[i][cc] += p_scaled[cc];
+      dot_ss += sp[i][cc] * sp[i][cc];
+    }
+    for (int cc = 0; cc < 3; cc++)
+      sp[i][cc] /= sqrt(dot_ss);
   }
 
   ecurrent = energy_force(0);
@@ -659,7 +583,7 @@ void MinSpinLBFGS::make_step(double c, double *energy_and_der)
   using the cubic interpolation
 ------------------------------------------------------------------------- */
 
-int MinSpinLBFGS::calc_and_make_step(double a, double b, int index)
+int MinSpinFP_LBFGS::calc_and_make_step(double a, double b, int index)
 {
   double e_and_d[2] = {0.0,0.0};
   double alpha,c1,c2,c3;
@@ -711,7 +635,7 @@ int MinSpinLBFGS::calc_and_make_step(double a, double b, int index)
   Approximate descent
 ------------------------------------------------------------------------- */
 
-int MinSpinLBFGS::adescent(double phi_0, double phi_j){
+int MinSpinFP_LBFGS::adescent(double phi_0, double phi_j){
 
   double eps = 1.0e-6;
 
@@ -721,7 +645,7 @@ int MinSpinLBFGS::adescent(double phi_0, double phi_j){
     return 0;
 }
 
-double MinSpinLBFGS::maximum_rotation(double *p)
+double MinSpinFP_LBFGS::maximum_rotation(double *p)
 {
   double norm2,norm2_global,scaling,alpha;
   int nlocal = atom->nlocal;

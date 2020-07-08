@@ -13,21 +13,21 @@
 
 #ifdef MINIMIZE_CLASS
 
-MinimizeStyle(spin/lbfgs, MinSpinLBFGS)
+MinimizeStyle(spin/fp_lbfgs, MinSpinFP_LBFGS)
 
 #else
 
-#ifndef LMP_MIN_SPIN_LBFGS_H
-#define LMP_MIN_SPIN_LBFGS_H
+#ifndef LMP_MIN_SPIN_FP_LBFGS_H
+#define LMP_MIN_SPIN_FP_LBFGS_H
 
 #include "min.h"
 
 namespace LAMMPS_NS {
 
-class MinSpinLBFGS: public Min {
+class MinSpinFP_LBFGS: public Min {
  public:
-  MinSpinLBFGS(class LAMMPS *);
-  virtual ~MinSpinLBFGS();
+  MinSpinFP_LBFGS(class LAMMPS *);
+  virtual ~MinSpinFP_LBFGS();
   void init();
   void setup_style();
   int modify_param(int, char **);
@@ -51,8 +51,6 @@ class MinSpinLBFGS: public Min {
   void advance_spins();
   void calc_gradient();
   void calc_search_direction();
-  void vm3(const double *, const double *, double *);
-  void rodrigues_rotation(const double *, double *);
   void make_step(double, double *);
   int calc_and_make_step(double, double, int);
   int adescent(double, double);
