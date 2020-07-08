@@ -51,6 +51,7 @@ class PairSpinDmi : public PairSpin {
   double **v_dmx, **v_dmy, **v_dmz;             // dmi direction
   double **vmech_dmx, **vmech_dmy, **vmech_dmz; // dmi mech direction
   double **cut_spin_dmi;                        // cutoff distance dmi
+  char dmitype[1];                              // type of dmi interaction (Neel or Bloch)
 
   void allocate();
 };

@@ -94,7 +94,7 @@ void PairSpinDmi::coeff(int narg, char **arg)
 
   if (strcmp(arg[2],"dmi") != 0)
     error->all(FLERR,"Incorrect args in pair_style command");
-  if (narg != 8)
+  if (narg != 9)
     error->all(FLERR,"Incorrect args in pair_style command");
 
   int ilo,ihi,jlo,jhi;
@@ -106,6 +106,10 @@ void PairSpinDmi::coeff(int narg, char **arg)
   double dmx = force->numeric(FLERR,arg[5]);
   double dmy = force->numeric(FLERR,arg[6]);
   double dmz = force->numeric(FLERR,arg[7]);
+
+  strcpy(dmitype, arg[8]);
+  if (strcmp(dmitype,"N") != 0 and strcmp(dmitype,"B") != 0)
+    error->all(FLERR,"Incorrect args in pair_style command");
 
   double inorm = 1.0/(dmx*dmx+dmy*dmy+dmz*dmz);
   dmx *= inorm;
@@ -371,9 +375,16 @@ void PairSpinDmi::compute_dmi(int i, int j, double eij[3], double fmi[3], double
   itype = type[i];
   jtype = type[j];
 
-  dmix = eij[1]*v_dmz[itype][jtype] - eij[2]*v_dmy[itype][jtype];
-  dmiy = eij[2]*v_dmx[itype][jtype] - eij[0]*v_dmz[itype][jtype];
-  dmiz = eij[0]*v_dmy[itype][jtype] - eij[1]*v_dmx[itype][jtype];
+  if (strcmp(dmitype,"B") == 0){
+    dmix = eij[0] * DM[itype][jtype]/hbar;
+    dmiy = eij[1] * DM[itype][jtype]/hbar;
+    dmiz = eij[2] * DM[itype][jtype]/hbar;
+  }
+  if (strcmp(dmitype,"N") == 0){
+    dmix = eij[1]*v_dmz[itype][jtype] - eij[2]*v_dmy[itype][jtype];
+    dmiy = eij[2]*v_dmx[itype][jtype] - eij[0]*v_dmz[itype][jtype];
+    dmiz = eij[0]*v_dmy[itype][jtype] - eij[1]*v_dmx[itype][jtype];
+  }
 
   fmi[0] -= (dmiy*spj[2] - dmiz*spj[1]);
   fmi[1] -= (dmiz*spj[0] - dmix*spj[2]);
