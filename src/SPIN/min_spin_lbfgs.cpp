@@ -72,10 +72,10 @@ MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
 
   nreplica = universe->nworlds;
   ireplica = universe->iworld;
-  use_line_search = 0;  // no line search as default option for LBFGS
-
+  use_line_search = 1;  // line search as default option for LBFGS
   maxepsrot = MY_2PI / (100.0);
-
+  num_mem = 3;
+  intervalsize=100.0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -97,12 +97,20 @@ MinSpinLBFGS::~MinSpinLBFGS()
 
 void MinSpinLBFGS::init()
 {
-  num_mem = 3;
   local_iter = 0;
   der_e_cur = 0.0;
   der_e_pr = 0.0;
+  e_cur = 0.0;
+  e_pr = 0.0;
+
+  c1=1.0e-4;
+  c2=0.9;
+  maxiterls=10;
+  epsdx=1.0e-10;
 
   Min::init();
+
+  if (linestyle == 4) use_line_search = 0;
 
   // warning if line_search combined to gneb
 
@@ -110,11 +118,7 @@ void MinSpinLBFGS::init()
     error->warning(FLERR,"Line search incompatible gneb");
 
   // set back use_line_search to 0 if more than one replica
-
-  if (linestyle == 3 && nreplica == 1){
-    use_line_search = 1;
-  }
-  else{
+  if (nreplica > 1){
     use_line_search = 0;
   }
 
@@ -160,6 +164,16 @@ int MinSpinLBFGS::modify_param(int narg, char **arg)
     double discrete_factor;
     discrete_factor = force->numeric(FLERR,arg[1]);
     maxepsrot = MY_2PI / (10 * discrete_factor);
+    return 2;
+  }
+  if (strcmp(arg[0],"memory") == 0) {
+    if (narg < 2) error->all(FLERR,"Illegal min_modify command");
+    num_mem = force->numeric(FLERR,arg[1]);
+    return 2;
+  }
+  if (strcmp(arg[0],"intervalsize") == 0) {
+    if (narg < 2) error->all(FLERR,"Illegal min_modify command");
+    intervalsize = force->numeric(FLERR,arg[1]);
     return 2;
   }
   return 0;
@@ -230,6 +244,7 @@ int MinSpinLBFGS::iterate(int maxiter)
         eprevious = ecurrent;
         ecurrent = energy_force(0);
         calc_gradient();
+        e_cur = ecurrent;
       }
 
       calc_search_direction();
@@ -243,11 +258,12 @@ int MinSpinLBFGS::iterate(int maxiter)
       }
       for (int i = 0; i < nlocal; i++)
         for (int j = 0; j < 3; j++)
-      sp_copy[i][j] = sp[i][j];
+          sp_copy[i][j] = sp[i][j];
 
       eprevious = ecurrent;
+      e_pr = e_cur;
       der_e_pr = der_e_cur;
-      calc_and_make_step(0.0, 1.0, 0);
+      calc_and_make_step();
     }
     else{
 
@@ -611,8 +627,12 @@ void MinSpinLBFGS::vm3(const double *m, const double *v, double *out)
   }
 }
 
+/* ----------------------------------------------------------------------
+   See Jorge Nocedal and Stephen J. Wright 'Numerical
+   Optimization' Second Edition, 2006 (p. 60)
+---------------------------------------------------------------------- */
 
-void MinSpinLBFGS::make_step(double c, double *energy_and_der)
+void MinSpinLBFGS::make_step(double steplength)
 {
   double p_scaled[3];
   int nlocal = atom->nlocal;
@@ -625,7 +645,7 @@ void MinSpinLBFGS::make_step(double c, double *energy_and_der)
 
     // scale the search direction
 
-    for (int j = 0; j < 3; j++) p_scaled[j] = c * p_s[3 * i + j];
+    for (int j = 0; j < 3; j++) p_scaled[j] = steplength * p_s[3 * i + j];
 
     // calculate rotation matrix
 
@@ -633,7 +653,7 @@ void MinSpinLBFGS::make_step(double c, double *energy_and_der)
 
     // rotate spins
 
-    vm3(rot_mat, sp[i], s_new);
+    vm3(rot_mat, sp_copy[i], s_new);
     for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
   }
 
@@ -650,61 +670,156 @@ void MinSpinLBFGS::make_step(double c, double *energy_and_der)
     MPI_Allreduce(&der_e_cur_tmp,&der_e_cur,1,MPI_DOUBLE,MPI_SUM,universe->uworld);
   }
 
-  energy_and_der[0] = ecurrent;
-  energy_and_der[1] = der_e_cur;
+  e_cur = ecurrent;
+}
+
+/* ---------------------------------------------------------------------
+  Calculate step length which satisfies approximate or strong
+  Wolfe conditions using the cubic interpolation
+------------------------------------------------------------------------- */
+
+int MinSpinLBFGS::calc_and_make_step()
+{
+  double **sp = atom->sp;
+  int nlocal = atom->nlocal;
+  double tmp1 = 0.0;
+  double tmp2 = 0.0;
+  int i = 1;
+  int need_amax=1;
+
+  double ei=e_cur;
+  double dei=der_e_cur;
+  double emax=0.0;
+  double demax=0.0;
+
+  double eim1=e_pr;
+  double deim1=der_e_pr;
+
+  double optstep=1.0;
+  double prevstep=0.0;
+
+  while (1){
+    make_step(optstep);
+    ei=e_cur;
+    dei=der_e_cur;
+    if (awc(der_e_pr, e_pr, dei, ei))
+      break;
+
+    tmp1 = e_pr + c1 * optstep * der_e_pr;
+    if (ei > tmp1 || (ei >= eim1 && i > 1)){
+      optstep = zoom(prevstep, optstep, eim1, deim1, ei, dei);
+      break;
+    }
+
+    tmp1=fabs(dei);
+    tmp2=-c2 * der_e_pr;
+    if (tmp1 <= tmp2)
+      break;
+    if (dei >= 0.0){
+      optstep = zoom(optstep, prevstep, ei, dei, eim1, deim1);
+      break;
+    }
+    if (i == maxiterls)
+      break;
+    tmp1 = fabs(intervalsize - optstep);
+    if (tmp1 < 1.0e-10){
+      intervalsize = 1.5 * optstep;
+      need_amax = 1;
+    }
+    // calculate things for maximum alpha
+    if (need_amax){
+      make_step(intervalsize);
+      emax = e_cur;
+      demax = der_e_cur;
+      need_amax = 0;
+      // check if max alpha satisfies awc:
+      if (awc(der_e_pr, e_pr, emax, demax)){
+        optstep = intervalsize;
+        break;
+      }
+    }
+
+    prevstep=optstep;
+    optstep = cubic_interpolation(
+            optstep, intervalsize,
+            ei, dei, emax, demax);
+    if (fabs(optstep-prevstep) < 1.0e-10){
+      make_step(optstep);
+      break;
+    }
+    eim1=ei;
+    deim1=dei;
+    i+=1;
+  }
+
+  MPI_Bcast(&optstep,1,MPI_DOUBLE,0,world);
+  for (int i = 0; i < 3 * nlocal; i++) {
+    p_s[i] = optstep * p_s[i];
+  }
+  return 0;
 }
 
 /* ----------------------------------------------------------------------
-  Calculate step length which satisfies approximate Wolfe conditions
-  using the cubic interpolation
-------------------------------------------------------------------------- */
+   See Jorge Nocedal and Stephen J. Wright 'Numerical
+   Optimization' Second Edition, 2006 (p. 61)
+---------------------------------------------------------------------- */
 
-int MinSpinLBFGS::calc_and_make_step(double a, double b, int index)
-{
-  double e_and_d[2] = {0.0,0.0};
-  double alpha,c1,c2,c3;
-  double **sp = atom->sp;
-  int nlocal = atom->nlocal;
+double MinSpinLBFGS::zoom(double a_lo, double a_hi, double f_lo, double df_lo,
+                           double f_hi, double df_hi){
+  int i = 0;
+  double ej;
+  double dej;
+  double tmp1;
+  double a_j;
 
-  make_step(b,e_and_d);
-  ecurrent = e_and_d[0];
-  der_e_cur = e_and_d[1];
-  index++;
-
-  if (adescent(eprevious,e_and_d[0]) || index == 5){
-    MPI_Bcast(&b,1,MPI_DOUBLE,0,world);
-    for (int i = 0; i < 3 * nlocal; i++) {
-      p_s[i] = b * p_s[i];
+  while(1){
+    a_j = cubic_interpolation(a_lo, a_hi, f_lo, f_hi, df_lo, df_hi);
+    if (a_j < 1.0e-6){
+      a_j = 1.0e-6;
+      make_step(a_j);
+      return a_j;
     }
-    return 1;
+    make_step(a_j);
+    ej = e_cur;
+    dej = der_e_cur;
+    if (awc(der_e_pr, e_pr, dej, ej))
+      return a_j;
+
+    tmp1=e_pr + c1 * a_j * der_e_pr;
+    if (ej > tmp1 || ej >= f_lo){
+      a_hi = a_j;
+      f_hi = ej;
+      df_hi = dej;
+    }
+    else{
+      if (fabs(dej) <= -c2*der_e_pr)
+        return a_j;
+      if (dej * (a_hi - a_lo) >= 0.0){
+        a_hi = a_lo;
+        f_hi = f_lo;
+        df_hi = df_lo;
+      }
+      a_lo = a_j;
+      f_lo = ej;
+      df_lo = dej;
+    }
+    i+=1;
+
+    if (fabs(a_lo - a_hi)< epsdx){
+      // to small interval quit
+      make_step(a_lo);
+      return a_lo;
+    }
+    if (i==maxiterls){
+      if (a_lo > epsdx){
+        make_step(a_lo);
+        return a_lo;
+      } else{
+        make_step(a_hi);
+        return a_hi;
+      }
+    }
   }
-  else{
-    double r,f0,f1,df0,df1;
-    r = b - a;
-    f0 = eprevious;
-    f1 = ecurrent;
-    df0 = der_e_pr;
-    df1 = der_e_cur;
-
-    c1 = -2.0*(f1-f0)/(r*r*r)+(df1+df0)/(r*r);
-    c2 = 3.0*(f1-f0)/(r*r)-(df1+2.0*df0)/(r);
-    c3 = df0;
-
-    // f(x) = c1 x^3 + c2 x^2 + c3 x^1 + c4
-    // has minimum at alpha below. We do not check boundaries.
-
-    alpha = (-c2 + sqrt(c2*c2 - 3.0*c1*c3))/(3.0*c1);
-    MPI_Bcast(&alpha,1,MPI_DOUBLE,0,world);
-
-    if (alpha < 0.0) alpha = r/2.0;
-
-    for (int i = 0; i < nlocal; i++) {
-      for (int j = 0; j < 3; j++) sp[i][j] = sp_copy[i][j];
-    }
-    calc_and_make_step(0.0, alpha, index);
-   }
-
-  return 0;
 }
 
 /* ----------------------------------------------------------------------
@@ -721,9 +836,30 @@ int MinSpinLBFGS::adescent(double phi_0, double phi_j){
     return 0;
 }
 
+/* ----------------------------------------------------------------------
+  Approximate Wolfe Conditions
+  Hager W.M. and H. Zhang, SIAM J. Optim. Vol. 16, No. 1, pp 170-192
+------------------------------------------------------------------------- */
+
+int MinSpinLBFGS::awc(double der_phi_0, double phi_0,
+                       double der_phi_j, double phi_j){
+
+  double eps = 1.0e-6;
+  double delta = 0.1;
+  double sigma = 0.9;
+  double dsnt =  phi_0 + eps * fabs(phi_0);
+  double tmp1 = (2.0*delta - 1.0) * der_phi_0;
+  double tmp2 = sigma * der_phi_0;
+
+  if (phi_j <= dsnt && tmp1 >= der_phi_j && der_phi_j>= tmp2)
+    return 1;
+  else
+    return 0;
+}
+
 double MinSpinLBFGS::maximum_rotation(double *p)
 {
-  double norm2,norm2_global,scaling,alpha;
+  double norm2,norm2_global,scaling,gamma;
   int nlocal = atom->nlocal;
   int ntotal = 0;
 
@@ -743,8 +879,60 @@ double MinSpinLBFGS::maximum_rotation(double *p)
 
   scaling = (maxepsrot * sqrt((double) ntotal / norm2_global));
 
-  if (scaling < 1.0) alpha = scaling;
-  else alpha = 1.0;
+  if (scaling < 1.0) gamma = scaling;
+  else gamma = 1.0;
 
-  return alpha;
+  return gamma;
+}
+
+double MinSpinLBFGS::cubic_interpolation(
+        double x_0, double x_1, double f_0, double f_1,
+        double df_0, double df_1){
+
+  if (x_0 > x_1){
+    double tmp=0.0;
+    tmp = x_0;
+    x_0 = x_1;
+    x_1 = tmp;
+    tmp = f_0;
+    f_0 = f_1;
+    f_1 = tmp;
+    tmp = df_0;
+    df_0 = df_1;
+    df_1 = tmp;
+  }
+
+  double r = x_1 - x_0;
+  double a = -2.0 * (f_1 - f_0)/(r*r*r) + (df_1 + df_0)/(r*r);
+  double b = 3.0 * (f_1 - f_0)/(r*r)-(df_1 + 2.0 * df_0)/r;
+  double c = df_0;
+  double d = f_0;
+  double D = b * b - 3.0 * a * c;
+  double r0;
+  double f_r0;
+  double deltax;
+  double minstep=0.0;
+
+  if (D < 0.0){
+    if (f_0 < f_1) minstep = x_0;
+    else minstep = x_1;
+  }
+  else {
+    r0 = (-b + sqrt(D)) / (3.0 * a) + x_0;
+    if (x_0 < r0 && r0 < x_1){
+      deltax=r0 - x_0;
+      f_r0 = a*(deltax*deltax*deltax) + b*(deltax*deltax) + c*deltax + d;
+      if (f_0 > f_r0 and f_1 > f_r0)
+        minstep = r0;
+      else{
+        if (f_0 < f_1) minstep = x_0;
+        else minstep = x_1;
+      }
+    }
+    else{
+      if (f_0 < f_1) minstep = x_0;
+      else minstep = x_1;
+    }
+  }
+  return minstep;
 }
