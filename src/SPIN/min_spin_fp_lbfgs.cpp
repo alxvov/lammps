@@ -530,7 +530,8 @@ void MinSpinFP_LBFGS::calc_search_direction()
    rotation of spins along the search direction
 ---------------------------------------------------------------------- */
 
-void MinSpinFP_LBFGS::advance_spins() {
+void MinSpinFP_LBFGS::advance_spins()
+{
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
   double normsp = 0.0;
@@ -570,7 +571,7 @@ void MinSpinFP_LBFGS::make_step(double steplength)
 
     normsp = 0.0;
     for (int cc = 0; cc < 3; cc++) {
-      sp[i][cc] += p_scaled[cc];
+      sp[i][cc] = sp_copy[i][cc] + p_scaled[cc];
       normsp += sp[i][cc] * sp[i][cc];
     }
     normsp = sqrt(normsp);
