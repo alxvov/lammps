@@ -258,7 +258,7 @@ int MinSpinLBFGS::iterate(int maxiter)
       }
       for (int i = 0; i < nlocal; i++)
         for (int j = 0; j < 3; j++)
-          sp_copy[i][j] = sp[i][j];
+      sp_copy[i][j] = sp[i][j];
 
       eprevious = ecurrent;
       e_pr = e_cur;
@@ -842,7 +842,7 @@ int MinSpinLBFGS::adescent(double phi_0, double phi_j){
 ------------------------------------------------------------------------- */
 
 int MinSpinLBFGS::awc(double der_phi_0, double phi_0,
-                       double der_phi_j, double phi_j){
+        double der_phi_j, double phi_j){
 
   double eps = 1.0e-6;
   double delta = 0.1;

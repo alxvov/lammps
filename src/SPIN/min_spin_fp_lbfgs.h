@@ -51,10 +51,13 @@ class MinSpinFP_LBFGS: public Min {
   void advance_spins();
   void calc_gradient();
   void calc_search_direction();
-  void make_step(double, double *);
-  int calc_and_make_step(double, double, int);
+  void make_step(double);
+  int calc_and_make_step();
   int adescent(double, double);
+  int awc(double, double, double, double );
   double maximum_rotation(double *);
+  double cubic_interpolation(double, double, double, double, double, double);
+  double zoom(double, double, double, double, double, double);
 
   double *rho;          // estimation of curvature
   double *alpha;        // other parameter for lbfgs
@@ -62,6 +65,16 @@ class MinSpinFP_LBFGS: public Min {
   double **dy;          // change in gradients between two iterations, dg
   double **sp_copy;     // copy of the spins
   int num_mem;          // number of stored steps
+
+  int maxiterls;
+  double epsdx;
+  double c1;
+  double c2;
+
+  double e_cur;
+  double e_pr;
+  double intervalsize;
+
   bigint last_negative;
 };
 
