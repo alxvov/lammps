@@ -531,27 +531,28 @@ void MinSpinLBFGS::advance_spins() {
   double cosa;
   double sina;
   double dotsp;
+  double psc[3];
 
   // loop on all spins on proc.
   for (int i = 0; i < nlocal; i++) {
-    angle = 0.0;
-    for (int cc = 0; cc < 3; cc++) {
-      angle += p_s[3*i+cc]*p_s[3*i+cc];
-    }
-    dotsp = p_s[3*i]*sp[i][2]-p_s[3*i+1]*sp[i][1]+p_s[3*i+2]*sp[i][0];
+    // scale the search direction
+    psc[0] = p_s[3*i+2];
+    psc[1] = -p_s[3*i+1];
+    psc[2] = p_s[3*i];
+    angle = psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2];
     angle = sqrt(angle);
-    if (angle > 1.0e-40){
+    if(angle>1.0e-100) {
+      psc[0] /= angle;
+      psc[1] /= angle;
+      psc[2] /= angle;
+      dotsp=psc[0]*sp_copy[i][0]+psc[1]*sp_copy[i][1]+psc[2]*sp_copy[i][2];
       cosa = cos(angle);
       sina = sin(angle);
-      cross[0] = (p_s[3 * i] * sp[i][1] + p_s[3 * i + 1] * sp[i][2]);
-      cross[1] = (-p_s[3 * i] * sp[i][0] + p_s[3 * i + 2] * sp[i][2]);
-      cross[2] = (-p_s[3 * i + 1] * sp[i][0] - p_s[3 * i + 2] * sp[i][1]);
-      sp[i][0] = cosa * sp[i][0] - sina * cross[0] / angle +
-                 (1.0 - cosa) * dotsp * p_s[3 * i + 2] / (angle * angle);
-      sp[i][1] = cosa * sp[i][1] - sina * cross[1] / angle -
-                 (1.0 - cosa) * dotsp * p_s[3 * i + 1] / (angle * angle);
-      sp[i][2] = cosa * sp[i][2] - sina * cross[2] / angle +
-                 (1.0 - cosa) * dotsp * p_s[3 * i + 0] / (angle * angle);
+      cross[0]=(psc[2]*sp[i][1]-psc[1]*sp[i][2]);
+      cross[1]=(-psc[2]*sp[i][0]+psc[0]*sp[i][2]);
+      cross[2]=(psc[1]*sp[i][0]-psc[0]*sp[i][1]);
+      for (int cc=0; cc<3; cc++)
+        sp[i][cc]=cosa*sp[i][cc]-sina*cross[cc]+(1.0-cosa)*dotsp*psc[cc];
     }
   }
 }
@@ -579,18 +580,19 @@ void MinSpinLBFGS::make_step(double steplength)
     psc[1] = -steplength * p_s[3*i+1];
     psc[2] = steplength * p_s[3*i];
     angle=psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2];
-    dotsp=psc[0]*sp_copy[i][0]+psc[1]*sp_copy[i][1]+psc[2]*sp_copy[i][2];
     angle = sqrt(angle);
     if(angle>1.0e-100) {
+      psc[0] /= angle;
+      psc[1] /= angle;
+      psc[2] /= angle;
+      dotsp=psc[0]*sp_copy[i][0]+psc[1]*sp_copy[i][1]+psc[2]*sp_copy[i][2];
       cosa = cos(angle);
       sina = sin(angle);
       cross[0]=(psc[2]*sp_copy[i][1]-psc[1]*sp_copy[i][2]);
       cross[1]=(-psc[2]*sp_copy[i][0]+psc[0]*sp_copy[i][2]);
       cross[2]=(psc[1]*sp_copy[i][0]-psc[0]*sp_copy[i][1]);
       for (int cc=0; cc<3; cc++)
-      sp[i][cc] = cosa * sp_copy[i][cc] - sina * cross[cc] / angle +
-                 (1.0 - cosa) * dotsp * psc[cc] / (angle * angle);
-
+      sp[i][cc]=cosa*sp_copy[i][cc]-sina*cross[cc]+(1.0-cosa)*dotsp*psc[cc];
     }
   }
 
