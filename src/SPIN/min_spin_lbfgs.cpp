@@ -74,7 +74,7 @@ MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
   ireplica = universe->iworld;
   use_line_search = 1;  // line search as default option for LBFGS
   maxepsrot = MY_2PI / (100.0);
-  num_mem = 3;
+  num_mem = 5;
   intervalsize=100.0;
 }
 
