@@ -523,107 +523,36 @@ void MinSpinLBFGS::calc_search_direction()
   local_iter++;
 }
 
-/* ----------------------------------------------------------------------
-   rotation of spins along the search direction
----------------------------------------------------------------------- */
-
-void MinSpinLBFGS::advance_spins()
-{
+void MinSpinLBFGS::advance_spins() {
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
-  double rot_mat[9]; // exponential of matrix made of search direction
-  double s_new[3];
+  double cross[3];
+  double angle = 0.0;
+  double cosa;
+  double sina;
+  double dotsp;
 
   // loop on all spins on proc.
-
   for (int i = 0; i < nlocal; i++) {
-    rodrigues_rotation(p_s + 3 * i, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
-  }
-}
-
-/* ----------------------------------------------------------------------
-  calculate 3x3 matrix exponential using Rodrigues' formula
-  (R. Murray, Z. Li, and S. Shankar Sastry,
-  A Mathematical Introduction to
-  Robotic Manipulation (1994), p. 28 and 30).
-
-  upp_tr - vector x, y, z so that one calculate
-  U = exp(A) with A= [[0, x, y],
-                      [-x, 0, z],
-                      [-y, -z, 0]]
-------------------------------------------------------------------------- */
-
-void MinSpinLBFGS::rodrigues_rotation(const double *upp_tr, double *out)
-{
-  double theta,A,B,D,x,y,z;
-  double s1,s2,s3,a1,a2,a3;
-
-  if (fabs(upp_tr[0]) < 1.0e-40 &&
-      fabs(upp_tr[1]) < 1.0e-40 &&
-      fabs(upp_tr[2]) < 1.0e-40){
-
-    // if upp_tr is zero, return unity matrix
-    for(int k = 0; k < 3; k++){
-      for(int m = 0; m < 3; m++){
-    if (m == k) out[3 * k + m] = 1.0;
-    else out[3 * k + m] = 0.0;
-        }
+    angle = 0.0;
+    for (int cc = 0; cc < 3; cc++) {
+      angle += p_s[3*i+cc]*p_s[3*i+cc];
     }
-    return;
-  }
-
-  theta = sqrt(upp_tr[0] * upp_tr[0] +
-               upp_tr[1] * upp_tr[1] +
-               upp_tr[2] * upp_tr[2]);
-
-  A = cos(theta);
-  B = sin(theta);
-  D = 1 - A;
-  x = upp_tr[0]/theta;
-  y = upp_tr[1]/theta;
-  z = upp_tr[2]/theta;
-
-  // diagonal elements of U
-
-  out[0] = A + z * z * D;
-  out[4] = A + y * y * D;
-  out[8] = A + x * x * D;
-
-  // off diagonal of U
-
-  s1 = -y * z *D;
-  s2 = x * z * D;
-  s3 = -x * y * D;
-
-  a1 = x * B;
-  a2 = y * B;
-  a3 = z * B;
-
-  out[1] = s1 + a1;
-  out[3] = s1 - a1;
-  out[2] = s2 + a2;
-  out[6] = s2 - a2;
-  out[5] = s3 + a3;
-  out[7] = s3 - a3;
-
-}
-
-/* ----------------------------------------------------------------------
-  out = vector^T x m,
-  m -- 3x3 matrix , v -- 3-d vector
-------------------------------------------------------------------------- */
-
-void MinSpinLBFGS::vm3(const double *m, const double *v, double *out)
-{
-  for(int i = 0; i < 3; i++){
-    out[i] = 0.0;
-    for(int j = 0; j < 3; j++)
-    out[i] += *(m + 3 * j + i) * v[j];
+    dotsp = p_s[3*i]*sp[i][2]-p_s[3*i+1]*sp[i][1]+p_s[3*i+2]*sp[i][0];
+    angle = sqrt(angle);
+    if (angle > 1.0e-40){
+      cosa = cos(angle);
+      sina = sin(angle);
+      cross[0] = (p_s[3 * i] * sp[i][1] + p_s[3 * i + 1] * sp[i][2]);
+      cross[1] = (-p_s[3 * i] * sp[i][0] + p_s[3 * i + 2] * sp[i][2]);
+      cross[2] = (-p_s[3 * i + 1] * sp[i][0] - p_s[3 * i + 2] * sp[i][1]);
+      sp[i][0] = cosa * sp[i][0] - sina * cross[0] / angle +
+                 (1.0 - cosa) * dotsp * p_s[3 * i + 2] / (angle * angle);
+      sp[i][1] = cosa * sp[i][1] - sina * cross[1] / angle -
+                 (1.0 - cosa) * dotsp * p_s[3 * i + 1] / (angle * angle);
+      sp[i][2] = cosa * sp[i][2] - sina * cross[2] / angle +
+                 (1.0 - cosa) * dotsp * p_s[3 * i + 0] / (angle * angle);
+    }
   }
 }
 
@@ -634,27 +563,35 @@ void MinSpinLBFGS::vm3(const double *m, const double *v, double *out)
 
 void MinSpinLBFGS::make_step(double steplength)
 {
-  double p_scaled[3];
+  double psc[3];
   int nlocal = atom->nlocal;
-  double rot_mat[9]; // exponential of matrix made of search direction
-  double s_new[3];
   double **sp = atom->sp;
   double der_e_cur_tmp = 0.0;
+  double cross[3];
+  double angle=0.0;
+  double cosa;
+  double sina;
+  double dotsp;
 
   for (int i = 0; i < nlocal; i++) {
-
     // scale the search direction
+    psc[0] = steplength * p_s[3*i+2];
+    psc[1] = -steplength * p_s[3*i+1];
+    psc[2] = steplength * p_s[3*i];
+    angle=psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2];
+    dotsp=psc[0]*sp_copy[i][0]+psc[1]*sp_copy[i][1]+psc[2]*sp_copy[i][2];
+    angle = sqrt(angle);
+    if(angle>1.0e-100) {
+      cosa = cos(angle);
+      sina = sin(angle);
+      cross[0]=(psc[2]*sp_copy[i][1]-psc[1]*sp_copy[i][2]);
+      cross[1]=(-psc[2]*sp_copy[i][0]+psc[0]*sp_copy[i][2]);
+      cross[2]=(psc[1]*sp_copy[i][0]-psc[0]*sp_copy[i][1]);
+      for (int cc=0; cc<3; cc++)
+      sp[i][cc] = cosa * sp_copy[i][cc] - sina * cross[cc] / angle +
+                 (1.0 - cosa) * dotsp * psc[cc] / (angle * angle);
 
-    for (int j = 0; j < 3; j++) p_scaled[j] = steplength * p_s[3 * i + j];
-
-    // calculate rotation matrix
-
-    rodrigues_rotation(p_scaled, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp_copy[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
+    }
   }
 
   ecurrent = energy_force(0);
@@ -820,20 +757,6 @@ double MinSpinLBFGS::zoom(double a_lo, double a_hi, double f_lo, double df_lo,
       }
     }
   }
-}
-
-/* ----------------------------------------------------------------------
-  Approximate descent
-------------------------------------------------------------------------- */
-
-int MinSpinLBFGS::adescent(double phi_0, double phi_j){
-
-  double eps = 1.0e-6;
-
-  if (phi_j<=phi_0+eps*fabs(phi_0))
-    return 1;
-  else
-    return 0;
 }
 
 /* ----------------------------------------------------------------------

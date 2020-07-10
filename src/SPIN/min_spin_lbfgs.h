@@ -51,11 +51,8 @@ class MinSpinLBFGS: public Min {
   void advance_spins();
   void calc_gradient();
   void calc_search_direction();
-  void vm3(const double *, const double *, double *);
-  void rodrigues_rotation(const double *, double *);
   void make_step(double);
   int calc_and_make_step();
-  int adescent(double, double);
   int awc(double, double, double, double );
   double maximum_rotation(double *);
   double cubic_interpolation(double, double, double, double, double, double);

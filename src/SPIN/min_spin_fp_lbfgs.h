@@ -53,7 +53,6 @@ class MinSpinFP_LBFGS: public Min {
   void calc_search_direction();
   void make_step(double);
   int calc_and_make_step();
-  int adescent(double, double);
   int awc(double, double, double, double );
   double maximum_rotation(double *);
   double cubic_interpolation(double, double, double, double, double, double);

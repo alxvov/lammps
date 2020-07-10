@@ -745,20 +745,6 @@ double MinSpinFP_LBFGS::zoom(double a_lo, double a_hi, double f_lo, double df_lo
 }
 
 /* ----------------------------------------------------------------------
-  Approximate descent
-------------------------------------------------------------------------- */
-
-int MinSpinFP_LBFGS::adescent(double phi_0, double phi_j){
-
-  double eps = 1.0e-6;
-
-  if (phi_j<=phi_0+eps*fabs(phi_0))
-    return 1;
-  else
-    return 0;
-}
-
-/* ----------------------------------------------------------------------
   Approximate Wolfe Conditions
   Hager W.M. and H. Zhang, SIAM J. Optim. Vol. 16, No. 1, pp 170-192
 ------------------------------------------------------------------------- */
