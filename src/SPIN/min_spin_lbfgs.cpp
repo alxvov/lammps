@@ -199,7 +199,7 @@ void MinSpinLBFGS::reset_vectors()
 }
 
 /* ----------------------------------------------------------------------
-   minimization via damped spin dynamics
+   direct minimization
 ------------------------------------------------------------------------- */
 
 int MinSpinLBFGS::iterate(int maxiter)
@@ -331,7 +331,7 @@ int MinSpinLBFGS::iterate(int maxiter)
 }
 
 /* ----------------------------------------------------------------------
-   calculate gradients
+   calculate gradient
 ---------------------------------------------------------------------- */
 
 void MinSpinLBFGS::calc_gradient()
@@ -559,11 +559,6 @@ void MinSpinLBFGS::advance_spins() {
   }
 }
 
-/* ----------------------------------------------------------------------
-   See Jorge Nocedal and Stephen J. Wright 'Numerical
-   Optimization' Second Edition, 2006 (p. 60)
----------------------------------------------------------------------- */
-
 void MinSpinLBFGS::make_step(double steplength)
 {
   double psc[3];
@@ -617,6 +612,8 @@ void MinSpinLBFGS::make_step(double steplength)
 /* ---------------------------------------------------------------------
   Calculate step length which satisfies approximate or strong
   Wolfe conditions using the cubic interpolation
+  See Jorge Nocedal and Stephen J. Wright 'Numerical
+  Optimization' Second Edition, 2006 (p. 60)
 ------------------------------------------------------------------------- */
 
 int MinSpinLBFGS::calc_and_make_step()
