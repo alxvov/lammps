@@ -72,7 +72,7 @@ MinSpinLBFGS::MinSpinLBFGS(LAMMPS *lmp) :
 
   nreplica = universe->nworlds;
   ireplica = universe->iworld;
-  use_line_search = 1;  // line search as default option for LBFGS
+  use_line_search = 0;  // no line search as default option for LBFGS
   maxepsrot = MY_2PI / (100.0);
   num_mem = 5;
   intervalsize=100.0;
@@ -110,16 +110,19 @@ void MinSpinLBFGS::init()
 
   Min::init();
 
-  if (linestyle == 4) use_line_search = 0;
-
   // warning if line_search combined to gneb
 
   if ((nreplica >= 1) && (linestyle != 4) && (comm->me == 0))
     error->warning(FLERR,"Line search incompatible gneb");
 
   // set back use_line_search to 0 if more than one replica
-  if (nreplica > 1)
+
+  if (linestyle == 3 && nreplica == 1){
+    use_line_search = 1;
+  }
+  else{
     use_line_search = 0;
+  }
 
   last_negative = update->ntimestep;
 
@@ -529,7 +532,7 @@ void MinSpinLBFGS::advance_spins() {
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
   double cross[3];
-  double angle = 0.0;
+  double angle;
   double cosa;
   double sina;
   double dotsp;
@@ -541,8 +544,7 @@ void MinSpinLBFGS::advance_spins() {
     psc[0] = p_s[3*i+2];
     psc[1] = -p_s[3*i+1];
     psc[2] = p_s[3*i];
-    angle = psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2];
-    angle = sqrt(angle);
+    angle = sqrt(psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2]);
     if(angle>1.0e-100) {
       psc[0] /= angle;
       psc[1] /= angle;
@@ -566,7 +568,7 @@ void MinSpinLBFGS::make_step(double steplength)
   double **sp = atom->sp;
   double der_e_cur_tmp = 0.0;
   double cross[3];
-  double angle=0.0;
+  double angle;
   double cosa;
   double sina;
   double dotsp;
@@ -576,8 +578,7 @@ void MinSpinLBFGS::make_step(double steplength)
     psc[0] = steplength * p_s[3*i+2];
     psc[1] = -steplength * p_s[3*i+1];
     psc[2] = steplength * p_s[3*i];
-    angle=psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2];
-    angle = sqrt(angle);
+    angle=sqrt(psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2]);
     if(angle>1.0e-100) {
       psc[0] /= angle;
       psc[1] /= angle;
