@@ -390,103 +390,36 @@ void MinSpinCG::calc_search_direction()
    rotation of spins along the search direction
 ---------------------------------------------------------------------- */
 
-void MinSpinCG::advance_spins()
-{
+void MinSpinCG::advance_spins() {
   int nlocal = atom->nlocal;
   double **sp = atom->sp;
-  double rot_mat[9];    // exponential of matrix made of search direction
-  double s_new[3];
+  double cross[3];
+  double angle;
+  double cosa;
+  double sina;
+  double dotsp;
+  double psc[3];
 
   // loop on all spins on proc.
-
   for (int i = 0; i < nlocal; i++) {
-    rodrigues_rotation(p_s + 3 * i, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
-  }
-}
-
-/* ----------------------------------------------------------------------
-  calculate 3x3 matrix exponential using Rodrigues' formula
-  (R. Murray, Z. Li, and S. Shankar Sastry,
-  A Mathematical Introduction to
-  Robotic Manipulation (1994), p. 28 and 30).
-
-  upp_tr - vector x, y, z so that one calculate
-  U = exp(A) with A= [[0, x, y],
-                      [-x, 0, z],
-                      [-y, -z, 0]]
-------------------------------------------------------------------------- */
-
-void MinSpinCG::rodrigues_rotation(const double *upp_tr, double *out)
-{
-  double theta,A,B,D,x,y,z;
-  double s1,s2,s3,a1,a2,a3;
-
-  if (fabs(upp_tr[0]) < 1.0e-40 &&
-      fabs(upp_tr[1]) < 1.0e-40 &&
-      fabs(upp_tr[2]) < 1.0e-40){
-
-    // if upp_tr is zero, return unity matrix
-
-    for(int k = 0; k < 3; k++){
-      for(int m = 0; m < 3; m++){
-        if (m == k) out[3 * k + m] = 1.0;
-        else out[3 * k + m] = 0.0;
-      }
+    // scale the search direction
+    psc[0] = p_s[3*i+2];
+    psc[1] = -p_s[3*i+1];
+    psc[2] = p_s[3*i];
+    angle = sqrt(psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2]);
+    if(angle>1.0e-100) {
+      psc[0] /= angle;
+      psc[1] /= angle;
+      psc[2] /= angle;
+      dotsp=psc[0]*sp[i][0]+psc[1]*sp[i][1]+psc[2]*sp[i][2];
+      cosa = cos(angle);
+      sina = sin(angle);
+      cross[0]=(psc[2]*sp[i][1]-psc[1]*sp[i][2]);
+      cross[1]=(-psc[2]*sp[i][0]+psc[0]*sp[i][2]);
+      cross[2]=(psc[1]*sp[i][0]-psc[0]*sp[i][1]);
+      for (int cc=0; cc<3; cc++)
+        sp[i][cc]=cosa*sp[i][cc]-sina*cross[cc]+(1.0-cosa)*dotsp*psc[cc];
     }
-    return;
-  }
-
-  theta = sqrt(upp_tr[0] * upp_tr[0] +
-               upp_tr[1] * upp_tr[1] +
-               upp_tr[2] * upp_tr[2]);
-
-  A = cos(theta);
-  B = sin(theta);
-  D = 1.0 - A;
-  x = upp_tr[0]/theta;
-  y = upp_tr[1]/theta;
-  z = upp_tr[2]/theta;
-
-  // diagonal elements of U
-
-  out[0] = A + z * z * D;
-  out[4] = A + y * y * D;
-  out[8] = A + x * x * D;
-
-  // off diagonal of U
-
-  s1 = -y * z *D;
-  s2 = x * z * D;
-  s3 = -x * y * D;
-
-  a1 = x * B;
-  a2 = y * B;
-  a3 = z * B;
-
-  out[1] = s1 + a1;
-  out[3] = s1 - a1;
-  out[2] = s2 + a2;
-  out[6] = s2 - a2;
-  out[5] = s3 + a3;
-  out[7] = s3 - a3;
-
-}
-
-/* ----------------------------------------------------------------------
-  out = vector^T x m,
-  m -- 3x3 matrix , v -- 3-d vector
-------------------------------------------------------------------------- */
-
-void MinSpinCG::vm3(const double *m, const double *v, double *out)
-{
-  for(int i = 0; i < 3; i++){
-    out[i] = 0.0;
-    for(int j = 0; j < 3; j++) out[i] += *(m + 3 * j + i) * v[j];
   }
 }
 
@@ -494,31 +427,38 @@ void MinSpinCG::vm3(const double *m, const double *v, double *out)
   advance spins
 ------------------------------------------------------------------------- */
 
-void MinSpinCG::make_step(double c, double *energy_and_der)
+void MinSpinCG::make_step(double steplength, double *energy_and_der)
 {
-  double p_scaled[3];
+  double psc[3];
   int nlocal = atom->nlocal;
-  double rot_mat[9]; // exponential of matrix made of search direction
-  double s_new[3];
   double **sp = atom->sp;
   double der_e_cur_tmp = 0.0;
+  double cross[3];
+  double angle=0.0;
+  double cosa;
+  double sina;
+  double dotsp;
 
   for (int i = 0; i < nlocal; i++) {
-
     // scale the search direction
-
-    for (int j = 0; j < 3; j++) p_scaled[j] = c * p_s[3 * i + j];
-
-    // calculate rotation matrix
-
-    rodrigues_rotation(p_scaled, rot_mat);
-
-    // rotate spins
-
-    vm3(rot_mat, sp[i], s_new);
-    for (int j = 0; j < 3; j++) sp[i][j] = s_new[j];
+    psc[0] = steplength * p_s[3*i+2];
+    psc[1] = -steplength * p_s[3*i+1];
+    psc[2] = steplength * p_s[3*i];
+    angle=sqrt(psc[0]*psc[0]+psc[1]*psc[1]+psc[2]*psc[2]);
+    if(angle>1.0e-100) {
+      psc[0] /= angle;
+      psc[1] /= angle;
+      psc[2] /= angle;
+      dotsp=psc[0]*sp[i][0]+psc[1]*sp[i][1]+psc[2]*sp[i][2];
+      cosa = cos(angle);
+      sina = sin(angle);
+      cross[0]=(psc[2]*sp[i][1]-psc[1]*sp[i][2]);
+      cross[1]=(-psc[2]*sp[i][0]+psc[0]*sp[i][2]);
+      cross[2]=(psc[1]*sp[i][0]-psc[0]*sp[i][1]);
+      for (int cc=0; cc<3; cc++)
+        sp[i][cc]=cosa*sp[i][cc]-sina*cross[cc]+(1.0-cosa)*dotsp*psc[cc];
+    }
   }
-
   ecurrent = energy_force(0);
   calc_gradient();
   neval++;

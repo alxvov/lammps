@@ -54,8 +54,6 @@ class MinSpinCG: public Min {
   void advance_spins();
   void calc_gradient();
   void calc_search_direction();
-  void vm3(const double *, const double *, double *);
-  void rodrigues_rotation(const double *, double *);
   void make_step(double, double *);
   int calc_and_make_step(double, double, int);
   int adescent(double, double);
